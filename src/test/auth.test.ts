@@ -1,29 +1,52 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { loadAppState, saveAppState } from '../lib/store';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock auth module
-vi.mock('../lib/auth', () => ({
-  signOut: vi.fn().mockResolvedValue(undefined),
+// Mock the entire auth module
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+      getUser: vi.fn(),
+    },
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      }),
+    }),
+  },
 }));
 
-import { signOut } from '../lib/auth';
-
-describe('Auth', () => {
+describe('Auth Service', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.clearAllMocks();
   });
 
-  describe('signOut', () => {
-    it('should clear localStorage and sign out from Supabase', async () => {
-      // Set some state
-      saveAppState({ loggedIn: true, email: 'test@example.com' });
+  describe('signInWithEmail', () => {
+    it('should handle invalid credentials', async () => {
+      const { signInWithEmail } = await import('../lib/auth');
       
-      // Call signOut
-      await signOut();
+      const result = await signInWithEmail('invalid', 'wrong');
       
-      // Verify Supabase signOut was called
-      expect(signOut).toHaveBeenCalled();
+      // Should return error or null user
+      expect(result.error).toBeTruthy();
+    });
+  });
+
+  describe('getCurrentUser', () => {
+    it('should return null when no user is logged in', async () => {
+      const { getCurrentUser } = await import('../lib/auth');
+      
+      const user = await getCurrentUser();
+      
+      expect(user).toBeNull();
     });
   });
 });

@@ -4,7 +4,8 @@ import { useMemo, useState, useEffect } from "react";
 import Toast from "@/components/toast";
 import UpsellModal from "@/components/upsell-modal";
 import InviteModal from "@/components/invite-modal";
-import { loadAppState, getFamilyMembers } from "@/lib/store";
+import { loadAppState, getFamilyMembers as getFamilyMembersLocal } from "@/lib/store";
+import { getFamilyMembers as getFamilyMembersSupabase, getTodayResponses as getTodayResponsesSupabase, submitResponse as submitResponseSupabase } from "@/lib/auth";
 
 type MemberStatus = "yes" | "no" | "unknown";
 
@@ -49,6 +50,7 @@ export default function TodayPage() {
     isOwner: boolean;
     familyId: string | null;
     memberId: string | null;
+    userId: string | null;
   } | null>(null);
   
   const [toast, setToast] = useState("");
@@ -66,22 +68,44 @@ export default function TodayPage() {
     const state = loadAppState();
     setAppState(state);
     
-    // 讀取成員列表
-    if (state.familyId) {
-      const familyMembers = getFamilyMembers(state.familyId);
-      setMembers(familyMembers);
-      
-      // 讀取今日回覆
-      const responseKey = `dinner_responses_${state.familyId}_${getTodayDate()}`;
-      const storedResponses = localStorage.getItem(responseKey);
-      if (storedResponses) {
-        try {
-          setResponses(JSON.parse(storedResponses));
-        } catch (e) {
-          console.error("Failed to parse responses:", e);
+    async function loadData() {
+      if (state.familyId) {
+        // 嘗試使用 Supabase
+        if (state.userId) {
+          try {
+            const [supabaseMembers, supabaseResponses] = await Promise.all([
+              getFamilyMembersSupabase(state.familyId),
+              getTodayResponsesSupabase(state.familyId),
+            ]);
+            
+            if (supabaseMembers.length > 0) {
+              setMembers(supabaseMembers);
+              setResponses(supabaseResponses as Record<string, MemberStatus>);
+              return;
+            }
+          } catch (err) {
+            console.log("Supabase not available, using localStorage");
+          }
+        }
+        
+        // Fallback: 使用 localStorage
+        const familyMembers = getFamilyMembersLocal(state.familyId);
+        setMembers(familyMembers);
+        
+        // 讀取今日回覆
+        const responseKey = `dinner_responses_${state.familyId}_${getTodayDate()}`;
+        const storedResponses = localStorage.getItem(responseKey);
+        if (storedResponses) {
+          try {
+            setResponses(JSON.parse(storedResponses));
+          } catch (e) {
+            console.error("Failed to parse responses:", e);
+          }
         }
       }
     }
+    
+    loadData();
   }, []);
 
   // 合併成員 + 回覆狀態
@@ -178,14 +202,23 @@ export default function TodayPage() {
   }
 
   // 回覆功能
-  function reply(status: MemberStatus) {
+  async function reply(status: MemberStatus) {
     if (!appState?.memberId) return;
     
-    // 更新狀態
+    // 更新本地狀態
     const newResponses = { ...responses, [appState.memberId]: status };
     setResponses(newResponses);
     
-    // 保存到 localStorage
+    // 嘗試使用 Supabase
+    if (appState.familyId && appState.userId) {
+      try {
+        await submitResponseSupabase(appState.familyId, appState.userId, status);
+      } catch (err) {
+        console.log("Supabase not available, using localStorage only");
+      }
+    }
+    
+    // 保存到 localStorage (fallback)
     if (appState.familyId) {
       const responseKey = `dinner_responses_${appState.familyId}_${getTodayDate()}`;
       localStorage.setItem(responseKey, JSON.stringify(newResponses));
@@ -198,11 +231,23 @@ export default function TodayPage() {
   }
 
   // 處理成員加入
-  function handleMemberJoined(name: string) {
+  async function handleMemberJoined(name: string) {
     // 重新加載成員列表
     if (appState?.familyId) {
-      const familyMembers = getFamilyMembers(appState.familyId);
-      setMembers(familyMembers);
+      // 嘗試使用 Supabase
+      if (appState.userId) {
+        try {
+          const familyMembers = await getFamilyMembersSupabase(appState.familyId);
+          setMembers(familyMembers);
+        } catch (err) {
+          // Fallback to localStorage
+          const familyMembers = getFamilyMembersLocal(appState.familyId);
+          setMembers(familyMembers);
+        }
+      } else {
+        const familyMembers = getFamilyMembersLocal(appState.familyId);
+        setMembers(familyMembers);
+      }
     }
     setToast(`${name} 已加入家庭`);
   }

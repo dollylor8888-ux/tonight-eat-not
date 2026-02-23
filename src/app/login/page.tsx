@@ -3,95 +3,225 @@
 import Link from "next/link";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { mockLogin, loadAppState } from "@/lib/store";
+import { loadAppState, saveAppState } from "@/lib/store";
+import { 
+  signInWithEmail, 
+  signUpWithEmail, 
+  getCurrentUser,
+  createFamily,
+  joinFamilyByCode,
+  getUserFamily,
+  AuthUser,
+  Family,
+  FamilyMember
+} from "@/lib/auth";
+import AddToHomeScreen from "@/components/add-to-homescreen";
 
-// Mock: 模擬用戶登入狀態
-type UserState = {
-  loggedIn: boolean;
-  phone: string;
-  hasFamily: boolean;
-  familyId: string | null;
-};
+type LoginStep = "choice" | "phone" | "otp" | "email-login" | "email-signup";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const nextParam = searchParams.get("next") || "";
   
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [seconds, setSeconds] = useState(60);
+  // Login state
+  const [step, setStep] = useState<LoginStep>("choice");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   
-  // Mock: 模擬已登入但未有家庭既狀態
-  const [user, setUser] = useState<UserState | null>(null);
+  // Phone login
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSeconds, setOtpSeconds] = useState(60);
+  
+  // Email login/signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
+
+  // User state
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   // 檢查是否已經登入
   useEffect(() => {
-    const state = loadAppState();
-    if (state.loggedIn && state.familyId) {
-      // 已經登入且有家庭 → 直接進 Today
+    checkAuth();
+  }, []);
+
+  async function checkAuth() {
+    const currentUser = await getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+      await checkUserFamily(currentUser);
+    }
+  }
+
+  async function checkUserFamily(authUser: AuthUser) {
+    const { family, member } = await getUserFamily(authUser.id);
+    
+    if (family && member) {
+      // 已有所屬家庭 → 進入 app
+      saveAppState({
+        loggedIn: true,
+        phone: authUser.phone,
+        email: authUser.email,
+        familyId: family.id,
+        familyName: family.name,
+        memberId: member.id,
+        displayName: member.displayName,
+        isOwner: member.isOwner,
+        role: member.role,
+        userId: authUser.id,
+      });
       router.push("/app/today");
-    } else if (state.loggedIn && !state.familyId) {
-      // 已經登入但冇家庭 → 去 Onboarding
+    } else {
+      // 未有家庭 → 去 onboarding
+      saveAppState({
+        loggedIn: true,
+        phone: authUser.phone,
+        email: authUser.email,
+        familyId: null,
+        familyName: null,
+        memberId: null,
+        displayName: authUser.displayName || null,
+        isOwner: false,
+        role: null,
+        userId: authUser.id,
+      });
       router.push("/onboarding");
     }
-  }, [router]);
+  }
 
+  // OTP timer
   useEffect(() => {
-    if (step !== "otp" || seconds <= 0) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setSeconds((v) => v - 1), 1000);
+    if (step !== "otp" || otpSeconds <= 0) return;
+    const timer = window.setTimeout(() => setOtpSeconds(v => v - 1), 1000);
     return () => window.clearTimeout(timer);
-  }, [step, seconds]);
+  }, [step, otpSeconds]);
 
-  // 登入成功後既導航邏輯：檢查是否已有家庭
-  useEffect(() => {
-    if (user?.loggedIn) {
-      if (user.hasFamily) {
-        // ✅ 已有家庭 → 直接進 Today
-        router.push("/app/today");
-      } else {
-        // ✅ 無家庭 → 去 Onboarding
-        router.push("/onboarding");
-      }
-    }
-  }, [user, router]);
-
+  // ==================== Phone Login ====================
   function sendOtp() {
     if (phone.length !== 8) {
       setError("請輸入 8 位香港手機號碼");
       return;
     }
-
     setError("");
     setStep("otp");
-    setSeconds(60);
+    setOtpSeconds(60);
   }
 
-  function verifyOtp() {
+  async function verifyOtp() {
     if (otp.length !== 6) {
       setError("請輸入 6 位驗證碼");
       return;
     }
-
+    
+    setLoading(true);
     setError("");
     
-    // ✅ 保存到 localStorage
-    mockLogin(phone);
+    // Mock: 模擬 OTP 驗證成功
+    // 實際應該打 API 驗證
+    await new Promise(r => setTimeout(r, 500));
     
-    // Mock: 模擬登入成功
-    // 假設呢個電話未有家庭 (hasFamily: false)
-    setUser({
+    const mockUser: AuthUser = {
+      id: "phone_" + phone,
+      email: null,
+      phone: "+852" + phone,
+      displayName: null,
+    };
+    
+    setUser(mockUser);
+    
+    // 模擬 localStorage 保存 (實際會用 Supabase)
+    saveAppState({
       loggedIn: true,
-      phone,
-      hasFamily: false,
+      phone: mockUser.phone,
       familyId: null,
+      familyName: null,
+      memberId: null,
+      displayName: null,
+      isOwner: false,
+      role: null,
+      userId: mockUser.id,
     });
+    
+    setLoading(false);
+    router.push("/onboarding");
   }
+
+  // ==================== Email Login ====================
+  async function handleEmailSubmit() {
+    if (!email || !password) {
+      setError("請輸入 email 和密碼");
+      return;
+    }
+
+    if (isSignup) {
+      // 註冊
+      if (password !== confirmPassword) {
+        setError("兩次密碼不一致");
+        return;
+      }
+      if (password.length < 6) {
+        setError("密碼至少 6 位");
+        return;
+      }
+      
+      setLoading(true);
+      setError("");
+      
+      const { user: newUser, error: signupError } = await signUpWithEmail(email, password, displayName);
+      
+      if (signupError) {
+        setError(signupError);
+        setLoading(false);
+        return;
+      }
+      
+      if (newUser) {
+        setUser(newUser);
+        saveAppState({
+          loggedIn: true,
+          email: newUser.email,
+          familyId: null,
+          familyName: null,
+          memberId: null,
+          displayName: newUser.displayName,
+          isOwner: false,
+          role: null,
+          userId: newUser.id,
+        });
+        setLoading(false);
+        router.push("/onboarding");
+      }
+    } else {
+      // 登入
+      setLoading(true);
+      setError("");
+      
+      const { user: loginUser, error: loginError } = await signInWithEmail(email, password);
+      
+      if (loginError) {
+        setError(loginError);
+        setLoading(false);
+        return;
+      }
+      
+      if (loginUser) {
+        await checkUserFamily(loginUser);
+        setLoading(false);
+      }
+    }
+  }
+
+  // 處理從邀請連結進入的情況
+  useEffect(() => {
+    if (nextParam.startsWith("/j/") && user) {
+      // 用戶已登入但未有所屬家庭，應該去加入家庭
+      router.push(nextParam);
+    }
+  }, [nextParam, user, router]);
 
   const showNextHint = nextParam.startsWith("/j/");
 
@@ -99,22 +229,190 @@ function LoginContent() {
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
       <h1 className="text-[22px] font-bold">登入</h1>
       <p className="mt-2 text-base text-[#444]">
-        {showNextHint ? "登入後加入家庭" : "輸入手機號碼"}
+        {showNextHint ? "登入後加入家庭" : "選擇登入方式"}
       </p>
 
-      {step === "phone" ? (
+      {/* Step: Choice */}
+      {step === "choice" && (
+        <section className="mt-8 space-y-4">
+          {/* Email 登入 */}
+          <button
+            onClick={() => setStep("email-login")}
+            className="tap-feedback card flex w-full items-center gap-4 p-4 text-left"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e8f8f5] text-xl">✉️</div>
+            <div>
+              <p className="font-semibold">Email 登入</p>
+              <p className="text-sm text-[#666]">使用 email 和密碼</p>
+            </div>
+          </button>
+
+          {/* Phone 登入 */}
+          <button
+            onClick={() => setStep("phone")}
+            className="tap-feedback card flex w-full items-center gap-4 p-4 text-left"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff3df] text-xl">📱</div>
+            <div>
+              <p className="font-semibold">手機號碼登入</p>
+              <p className="text-sm text-[#666]">使用香港手機號碼</p>
+            </div>
+          </button>
+
+          <p className="mt-6 text-center text-sm text-[#888]">
+            首次登入會自動創建帳戶
+          </p>
+        </section>
+      )}
+
+      {/* Step: Email Login */}
+      {step === "email-login" && (
         <section className="mt-8 card p-5">
+          <button 
+            onClick={() => { setStep("choice"); setError(""); }}
+            className="mb-4 text-sm text-[#666]"
+          >
+            ← 返回
+          </button>
+          
+          <h2 className="text-lg font-semibold">Email 登入</h2>
+          
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="text-[13px] text-[#444]">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="your@email.com"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[13px] text-[#444]">密碼</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && <p className="text-[13px] text-[#e74c3c]">{error}</p>}
+
+            <button 
+              onClick={handleEmailSubmit}
+              disabled={loading}
+              className="tap-feedback h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white disabled:opacity-60"
+            >
+              {loading ? "登入中..." : "登入"}
+            </button>
+
+            <p className="text-center text-sm text-[#666]">
+              未有帳戶？{" "}
+              <button 
+                onClick={() => { setIsSignup(true); setStep("email-signup"); }}
+                className="text-[#f5b041] font-semibold"
+              >
+                註冊
+              </button>
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Step: Email Signup */}
+      {step === "email-signup" && (
+        <section className="mt-8 card p-5">
+          <button 
+            onClick={() => { setStep("email-login"); setError(""); }}
+            className="mb-4 text-sm text-[#666]"
+          >
+            ← 返回
+          </button>
+          
+          <h2 className="text-lg font-semibold">創建帳戶</h2>
+          
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="text-[13px] text-[#444]">顯示名稱</label>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="你想其他人點稱呼你？"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[13px] text-[#444]">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="your@email.com"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[13px] text-[#444]">密碼</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="至少 6 位"
+              />
+            </div>
+
+            <div>
+              <label className="text-[13px] text-[#444]">確認密碼</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                className="mt-1 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+                placeholder="再次輸入密碼"
+              />
+            </div>
+
+            {error && <p className="text-[13px] text-[#e74c3c]">{error}</p>}
+
+            <button 
+              onClick={handleEmailSubmit}
+              disabled={loading}
+              className="tap-feedback h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white disabled:opacity-60"
+            >
+              {loading ? "創建中..." : "創建帳戶"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Step: Phone */}
+      {step === "phone" && (
+        <section className="mt-8 card p-5">
+          <button 
+            onClick={() => { setStep("choice"); setError(""); }}
+            className="mb-4 text-sm text-[#666]"
+          >
+            ← 返回
+          </button>
+          
           <label className="text-[13px] text-[#444]">香港手機號碼</label>
           <div className="mt-2 flex h-12 items-center rounded-xl border border-[#ddd] bg-white px-4">
             <span className="mr-2 text-sm text-[#444]">+852</span>
             <input
               value={phone}
-              onChange={(event) => {
-                setPhone(event.target.value.replace(/\D/g, "").slice(0, 8));
+              onChange={(e) => {
+                setPhone(e.target.value.replace(/\D/g, "").slice(0, 8));
                 setError("");
               }}
               inputMode="numeric"
-              className="w-full border-0 bg-transparent text-base text-[#212121] outline-none"
+              className="w-full border-0 bg-transparent text-base outline-none"
               placeholder="91234567"
             />
           </div>
@@ -124,17 +422,20 @@ function LoginContent() {
           </button>
           <p className="mt-3 text-[13px] text-[#444]">我哋唔會亂發訊息</p>
         </section>
-      ) : (
+      )}
+
+      {/* Step: OTP */}
+      {step === "otp" && (
         <section className="mt-8 card p-5">
           <h2 className="text-lg font-semibold">輸入 6 位驗證碼</h2>
           <input
             value={otp}
-            onChange={(event) => {
-              setOtp(event.target.value.replace(/\D/g, "").slice(0, 6));
+            onChange={(e) => {
+              setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
               setError("");
             }}
             inputMode="numeric"
-            className="mt-4 h-12 w-full rounded-xl border border-[#ddd] px-4 text-center text-xl text-[#212121] tracking-[0.35em] outline-none"
+            className="mt-4 h-12 w-full rounded-xl border border-[#ddd] px-4 text-center text-xl tracking-[0.35em] outline-none"
             placeholder="_ _ _ _ _ _"
           />
           {error && <p className="mt-2 text-[13px] text-[#e74c3c]">{error}</p>}
@@ -142,11 +443,11 @@ function LoginContent() {
             確認
           </button>
           <button
-            onClick={() => setSeconds(60)}
-            disabled={seconds > 0}
+            onClick={() => setOtpSeconds(60)}
+            disabled={otpSeconds > 0}
             className="tap-feedback mt-3 text-[13px] text-[#444] disabled:text-[#999]"
           >
-            {seconds > 0 ? `${seconds} 秒後可重發` : "重發驗證碼"}
+            {otpSeconds > 0 ? `${otpSeconds} 秒後可重發` : "重發驗證碼"}
           </button>
         </section>
       )}
@@ -154,6 +455,10 @@ function LoginContent() {
       <Link href={nextParam || "/"} className="mt-8 block text-center text-sm text-[#444] underline">
         返回
       </Link>
+
+      <div className="mt-8">
+        <AddToHomeScreen variant="button" />
+      </div>
     </main>
   );
 }

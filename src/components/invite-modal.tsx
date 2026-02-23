@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { loadAppState, getInviteCode } from "@/lib/store";
+import { getInviteLink } from "@/lib/utils";
 
 type InviteModalProps = {
   open: boolean;
@@ -30,7 +31,7 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
   }, [open]);
 
   // 邀請連結
-  const link = inviteCode ? `https://dinner.hk/j/${inviteCode}` : "";
+  const link = inviteCode ? getInviteLink(inviteCode) : "";
   const shareText = inviteCode ? `加入我哋既家庭「${familyName}」，一齊今晚食唔食！🍚 ${link}` : "";
 
   if (!open) return null;

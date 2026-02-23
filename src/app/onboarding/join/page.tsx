@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mockJoinFamily } from "@/lib/store";
 
-// Mock: 模擬 invite 查詢
+// Mock: 模擬 invite 查詢（呢個係後備，主要睇 verifyInviteCode）
 type InviteInfo = {
   code: string;
   familyId: string;
@@ -13,12 +13,20 @@ type InviteInfo = {
   invitedBy: string;
 };
 
+// Demo invite codes for testing
+const demoInvites: Record<string, InviteInfo> = {
+  "DEMO1": { code: "DEMO1", familyId: "fam_demo1", familyName: "陳家", invitedBy: "媽媽" },
+  "DEMO2": { code: "DEMO2", familyId: "fam_demo2", familyName: "李家", invitedBy: "爸爸" },
+  "ABCD": { code: "ABCD", familyId: "fam_abc123", familyName: "陳家", invitedBy: "Aaron" },
+  "EFGH": { code: "EFGH", familyId: "fam_def456", familyName: "李家", invitedBy: "爸爸" },
+};
+
 const mockInviteCheck = (code: string): InviteInfo | null => {
-  const invites: Record<string, InviteInfo> = {
-    "ABCD": { code: "ABCD", familyId: "fam_abc123", familyName: "陳家", invitedBy: "Aaron" },
-    "EFGH": { code: "EFGH", familyId: "fam_def456", familyName: "李家", invitedBy: "爸爸" },
-  };
-  return invites[code.toUpperCase()] || null;
+  // First check demo invites
+  if (demoInvites[code.toUpperCase()]) {
+    return demoInvites[code.toUpperCase()];
+  }
+  return null;
 };
 
 export default function JoinFamilyPage() {

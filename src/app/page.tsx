@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import AddToHomeScreen from "@/components/add-to-homescreen";
+import { initDemoData } from "@/lib/store";
+import { useEffect } from "react";
 
 const faqs = [
   {
@@ -7,7 +12,7 @@ const faqs = [
   },
   {
     q: "要唔要下載 App？",
-    a: "唔使下載，直接用網頁；你亦可以加到主畫面好似 App 咁用。",
+    a: "唔使下載，直接用網頁；你亦可以加到主畫面，好似 App 咁用。",
   },
   {
     q: "點樣邀請家人？",
@@ -16,6 +21,11 @@ const faqs = [
 ];
 
 export default function LandingPage() {
+  // 初始化演示數據
+  useEffect(() => {
+    initDemoData();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#212121]">
       <header className="border-b border-[#ececec] bg-white">
@@ -34,11 +44,13 @@ export default function LandingPage() {
           <Link href="/login" className="tap-feedback mt-6 flex h-[52px] w-full items-center justify-center rounded-[14px] bg-[#f5b041] text-base font-bold text-white">
             立即開始（免費）
           </Link>
-          <p className="mt-3 text-center text-[13px] text-[#444]">無需下載 App（可加到主畫面）</p>
+          <div className="mt-4 flex justify-center">
+            <AddToHomeScreen variant="button" />
+          </div>
         </section>
 
         <section className="card p-6">
-          <h2 className="text-xl font-semibold">How it works</h2>
+          <h2 className="text-xl font-semibold">點運作</h2>
           <ol className="mt-4 space-y-3 text-base">
             <li>① 建家庭</li>
             <li>② 邀家人</li>
@@ -47,12 +59,14 @@ export default function LandingPage() {
         </section>
 
         <section className="card p-6">
-          <h2 className="text-xl font-semibold">Social proof</h2>
-          <p className="mt-3 text-base text-[#333]">已幫 XX 個香港家庭減少 WhatsApp 追問。</p>
+          <h2 className="text-xl font-semibold">已經有咁多家庭係用</h2>
+          <p className="mt-3 text-base text-[#333]">
+            已幫 XX 個香港家庭減少 WhatsApp 追問。
+          </p>
         </section>
 
         <section className="card p-6">
-          <h2 className="text-xl font-semibold">FAQ</h2>
+          <h2 className="text-xl font-semibold">常見問題</h2>
           <div className="mt-4 space-y-4">
             {faqs.map((faq) => (
               <div key={faq.q}>

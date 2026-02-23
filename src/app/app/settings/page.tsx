@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loadAppState, clearAppState } from "@/lib/store";
+import { signOut as signOutSupabase } from "@/lib/auth";
+import AddToHomeScreen from "@/components/add-to-homescreen";
 
 // 成員類型
 type FamilyMember = {
@@ -97,8 +99,13 @@ export default function SettingsPage() {
   };
 
   // 登出
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm("你確定要登出嗎？")) {
+      try {
+        await signOutSupabase();
+      } catch (e) {
+        // 忽略 Supabase 錯誤
+      }
       clearAppState();
       router.push("/");
     }
@@ -148,10 +155,8 @@ export default function SettingsPage() {
           </>
         )}
         
-        <button className="tap-feedback mt-3 h-12 w-full rounded-xl border border-[#f5b041] text-base font-semibold text-[#b66d00]">
-          啟用 Web 通知
-        </button>
-        <p className="mt-2 text-[13px] text-[#444]">iPhone 需先「加入主畫面」。</p>
+        <AddToHomeScreen variant="button" />
+        <p className="mt-2 text-[13px] text-[#888]">加到主畫面後可以收到通知</p>
       </section>
 
       {/* 家庭成員 - 只有管理員可以管理 */}

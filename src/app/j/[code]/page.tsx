@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { loadAppState, verifyInviteCode, mockJoinFamily } from "@/lib/store";
+import { loadAppState, saveAppState } from "@/lib/store";
+import { verifyInviteCode as verifyInviteCodeSupabase, joinFamilyByCode } from "@/lib/auth";
 
 type InviteData = {
   code: string;
@@ -30,27 +31,80 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const hasFamily = !!state.familyId;
 
   useEffect(() => {
-    // 驗證邀請碼
-    const result = verifyInviteCode(code);
-    
-    if (result.valid && result.familyId && result.familyName) {
-      setInvite({
-        code: code.toUpperCase(),
-        familyName: result.familyName,
-        familyId: result.familyId,
-        valid: true,
-      });
-    } else {
-      setInvite(null);
+    // 嘗試使用 Supabase 驗證邀請碼
+    async function checkInvite() {
+      try {
+        const result = await verifyInviteCodeSupabase(code);
+        
+        if (result.valid && result.familyId && result.familyName) {
+          setInvite({
+            code: code.toUpperCase(),
+            familyName: result.familyName!,
+            familyId: result.familyId!,
+            valid: true,
+          });
+        } else {
+          // Fallback to localStorage
+          const localResult = verifyInviteCodeLocal(code);
+          if (localResult.valid) {
+            setInvite({
+              code: code.toUpperCase(),
+              familyName: localResult.familyName!,
+              familyId: localResult.familyId!,
+              valid: true,
+            });
+          } else {
+            setInvite(null);
+          }
+        }
+      } catch (err) {
+        // Fallback to localStorage
+        const localResult = verifyInviteCodeLocal(code);
+        if (localResult.valid) {
+          setInvite({
+            code: code.toUpperCase(),
+            familyName: localResult.familyName!,
+            familyId: localResult.familyId!,
+            valid: true,
+          });
+        } else {
+          setInvite(null);
+        }
+      }
+      
+      setLoading(false);
     }
     
-    setLoading(false);
+    checkInvite();
   }, [code]);
+
+  // Fallback: localStorage 驗證
+  function verifyInviteCodeLocal(code: string): { valid: boolean; familyId?: string; familyName?: string } {
+    if (typeof window === "undefined") return { valid: false };
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("dinner_invite_")) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key)!);
+          if (data.code === code.toUpperCase()) {
+            return { valid: true, familyId: data.familyId, familyName: data.familyName };
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    return { valid: false };
+  }
 
   // 未登入 → 導去登入
   useEffect(() => {
     if (!loading && !isLoggedIn) {
-      router.push(`/login?next=/j/${code}`);
+      const timer = setTimeout(() => {
+        router.push(`/login?next=/j/${code}`);
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [router, code, isLoggedIn, loading]);
 
@@ -70,14 +124,56 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     }
 
     setJoining(true);
+    setError("");
+
+    try {
+      // 嘗試使用 Supabase
+      const state = loadAppState();
+      const userId = state.userId;
+      
+      if (userId) {
+        const { family, member, error: joinError } = await joinFamilyByCode(
+          userId,
+          invite.code,
+          displayName.trim(),
+          role
+        );
+        
+        if (joinError) {
+          setError(joinError);
+          setJoining(false);
+          return;
+        }
+        
+        // 保存到 localStorage
+        saveAppState({
+          familyId: family!.id,
+          familyName: family!.name,
+          memberId: member!.id,
+          displayName: member!.displayName,
+          isOwner: member!.isOwner,
+          role: member!.role,
+        });
+        
+        router.push("/app/today");
+      } else {
+        // Fallback: 使用 localStorage
+        await joinFamilyLocal(invite.familyId, invite.familyName, displayName.trim(), role);
+        router.push("/app/today");
+      }
+    } catch (err: any) {
+      // Fallback: 使用 localStorage
+      await joinFamilyLocal(invite.familyId, invite.familyName, displayName.trim(), role);
+      router.push("/app/today");
+    }
     
-    // 模擬 API 延遲
-    await new Promise((r) => setTimeout(r, 500));
-    
-    // 加入家庭（傳入 role 參數）
-    mockJoinFamily(invite.familyId, invite.familyName, displayName, role);
-    
-    router.push("/app/today");
+    setJoining(false);
+  }
+
+  // Mock join (localStorage fallback)
+  async function joinFamilyLocal(familyId: string, familyName: string, displayName: string, role: string) {
+    const { mockJoinFamily } = await import("@/lib/store");
+    mockJoinFamily(familyId, familyName, displayName, role);
   }
 
   if (loading) {
@@ -188,7 +284,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
           <label className="text-base text-[#444]">你既名稱</label>
           <input
             className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base text-[#212121]"
-            placeholder="你想其他人點称呼你？"
+            placeholder="你想其他人點稱呼你？"
             value={displayName}
             onChange={(e) => {
               setDisplayName(e.target.value);

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { mockCreateFamily } from "@/lib/store";
+import { loadAppState, saveAppState } from "@/lib/store";
+import { createFamily, getFamilyMembers, getTodayResponses, Family, FamilyMember } from "@/lib/auth";
 
 export default function CreateFamilyPage() {
   const router = useRouter();
@@ -24,12 +25,61 @@ export default function CreateFamilyPage() {
     }
     
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
+    setError("");
     
-    // 保存到 localStorage（包含 role）
-    mockCreateFamily(familyName.trim(), displayName.trim(), role);
+    try {
+      // 從 localStorage 獲取 userId
+      const state = loadAppState();
+      const userId = state.userId;
+      
+      if (!userId) {
+        // Fallback: 使用 localStorage mock
+        console.log("Using localStorage fallback (no Supabase user)");
+        await createFamilyMock(familyName.trim(), displayName.trim(), role);
+        router.push("/app/today");
+        return;
+      }
+      
+      // 使用 Supabase 創建家庭
+      const { family, member, error: createError } = await createFamily(
+        userId,
+        familyName.trim(),
+        displayName.trim(),
+        role
+      );
+      
+      if (createError) {
+        setError(createError);
+        setLoading(false);
+        return;
+      }
+      
+      // 保存到 localStorage
+      saveAppState({
+        familyId: family!.id,
+        familyName: family!.name,
+        memberId: member!.id,
+        displayName: member!.displayName,
+        isOwner: member!.isOwner,
+        role: member!.role,
+      });
+      
+      router.push("/app/today");
+    } catch (err: any) {
+      console.error("Create family error:", err);
+      // Fallback to mock
+      await createFamilyMock(familyName.trim(), displayName.trim(), role);
+      router.push("/app/today");
+    }
     
-    router.push("/app/today");
+    setLoading(false);
+  }
+
+  // Mock 版本 (當 Supabase 不可用時)
+  async function createFamilyMock(familyName: string, displayName: string, role: string) {
+    const state = loadAppState();
+    const { mockCreateFamily } = await import("@/lib/store");
+    mockCreateFamily(familyName, displayName, role);
   }
 
   return (

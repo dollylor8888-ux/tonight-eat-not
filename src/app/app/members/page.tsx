@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadAppState, getFamilyMembers } from "@/lib/store";
+import { loadAppState, getFamilyMembers as getFamilyMembersLocal, getInviteCode } from "@/lib/store";
+import { getFamilyMembers as getFamilyMembersSupabase, getInviteCodeSupabase } from "@/lib/auth";
+import { getInviteLink } from "@/lib/utils";
 import Toast from "@/components/toast";
 
 type FamilyMember = {
@@ -18,31 +20,47 @@ export default function MembersPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 從 localStorage 讀取成員列表同邀請碼
+  // 讀取成員列表同邀請碼
   useEffect(() => {
     const state = loadAppState();
     
-    if (state.familyId) {
-      const familyMembers = getFamilyMembers(state.familyId);
-      setMembers(familyMembers);
-      
-      // 獲取邀請碼
-      const codeKey = `dinner_invite_${state.familyId}`;
-      const stored = localStorage.getItem(codeKey);
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          setInviteCode(data.code || "");
-        } catch (e) {
-          console.error("Failed to parse invite:", e);
+    async function loadData() {
+      if (state.familyId) {
+        // 嘗試使用 Supabase
+        if (state.userId) {
+          try {
+            const [supabaseMembers, supabaseCode] = await Promise.all([
+              getFamilyMembersSupabase(state.familyId),
+              getInviteCodeSupabase(state.familyId),
+            ]);
+            
+            if (supabaseMembers.length > 0) {
+              setMembers(supabaseMembers);
+              setInviteCode(supabaseCode || "");
+              setLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.log("Supabase not available, using localStorage");
+          }
         }
+        
+        // Fallback: 使用 localStorage
+        const familyMembers = getFamilyMembersLocal(state.familyId);
+        setMembers(familyMembers);
+        
+        // 獲取邀請碼
+        const code = getInviteCode(state.familyId);
+        setInviteCode(code || "");
       }
+      
+      setLoading(false);
     }
     
-    setLoading(false);
+    loadData();
   }, []);
 
-  const link = inviteCode ? `https://dinner.hk/j/${inviteCode}` : "";
+  const link = inviteCode ? getInviteLink(inviteCode) : "";
   const shareText = link ? `加入我哋既家庭，一齊今晚食唔食！🍚 ${link}` : "";
 
   // Web Share API

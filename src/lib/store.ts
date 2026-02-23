@@ -7,6 +7,8 @@ export type AppState = {
   // 用戶狀態
   loggedIn: boolean;
   phone: string | null;
+  email: string | null;
+  userId: string | null;  // Supabase user ID
   
   // 家庭狀態
   familyId: string | null;
@@ -34,6 +36,8 @@ const STATE_CHANGED_EVENT = "dinner_state_changed";
 const defaultState: AppState = {
   loggedIn: false,
   phone: null,
+  email: null,
+  userId: null,
   familyId: null,
   familyName: null,
   memberId: null,
@@ -254,4 +258,70 @@ export function getFamilyMembers(familyId: string): FamilyMember[] {
     }
   }
   return [];
+}
+
+// 初始化演示數據（如果冇家庭既話）
+export function initDemoData() {
+  if (typeof window === "undefined") return;
+  
+  // 如果已經有家庭數據，就唔好初始化
+  const state = loadAppState();
+  if (state.familyId) return;
+  
+  // 檢查係咪已經初始化過
+  const initKey = "dinner_demo_initialized";
+  if (localStorage.getItem(initKey)) return;
+  
+  // 創建演示家庭
+  const demoFamilyId = "fam_demo123";
+  const demoMembers: FamilyMember[] = [
+    {
+      id: "mem_mom",
+      displayName: "媽媽",
+      role: "媽媽",
+      isOwner: true,
+      joinedAt: new Date().toISOString(),
+    },
+    {
+      id: "mem_dad",
+      displayName: "爸爸",
+      role: "爸爸",
+      isOwner: false,
+      joinedAt: new Date().toISOString(),
+    },
+    {
+      id: "mem_kid",
+      displayName: "阿仔",
+      role: "子女",
+      isOwner: false,
+      joinedAt: new Date().toISOString(),
+    },
+  ];
+  
+  // 保存成員
+  localStorage.setItem(`dinner_members_${demoFamilyId}`, JSON.stringify(demoMembers));
+  
+  // 保存邀請碼
+  const demoInvite = {
+    code: "DEMO1",
+    familyId: demoFamilyId,
+    familyName: "陳家",
+    createdBy: "mem_mom",
+    createdAt: new Date().toISOString(),
+  };
+  localStorage.setItem(`dinner_invite_${demoFamilyId}`, JSON.stringify(demoInvite));
+  
+  // 設置今日回覆（部分人已回覆）
+  const today = new Date().toISOString().split("T")[0];
+  const demoResponses = {
+    "mem_mom": "yes",
+    "mem_dad": "unknown",
+    "mem_kid": "yes",
+  };
+  localStorage.setItem(`dinner_responses_${demoFamilyId}_${today}`, JSON.stringify(demoResponses));
+  
+  // 記錄已初始化
+  localStorage.setItem(initKey, "true");
+  
+  console.log("Demo data initialized!");
 }

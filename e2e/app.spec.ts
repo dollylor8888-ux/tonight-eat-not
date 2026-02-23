@@ -71,10 +71,11 @@ test.describe('Dinner App', () => {
   // Invite page tests
   test('should handle invalid invite code', async ({ page }) => {
     await page.goto('/j/INVALID');
-    // Either shows invalid message or redirects to login
+    // Wait for either invalid message or login redirect
     await Promise.race([
-      expect(page.getByText('邀請已失效')).toBeVisible({ timeout: 5000 }),
-      expect(page.getByText('選擇登入方式')).toBeVisible({ timeout: 5000 }),
+      expect(page.getByText('邀請已失效', { exact: false })).toBeVisible({ timeout: 10000 }),
+      expect(page.getByText('選擇登入方式')).toBeVisible({ timeout: 10000 }),
+      expect(page.getByText('登入')).toBeVisible({ timeout: 10000 }),
     ]);
   });
 

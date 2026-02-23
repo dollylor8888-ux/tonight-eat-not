@@ -19,6 +19,10 @@ test.describe('Dinner App', () => {
     await expect(page.getByText('建家庭')).toBeVisible();
   });
 
+  test('should show faq section', async ({ page }) => {
+    await expect(page.getByText('常見問題')).toBeVisible();
+  });
+
   // Navigation tests
   test('should navigate to login page via 立即開始 button', async ({ page }) => {
     await page.getByRole('link', { name: '立即開始' }).click();
@@ -49,6 +53,12 @@ test.describe('Dinner App', () => {
     await expect(page.getByText('未有帳戶？')).toBeVisible();
   });
 
+  test('should show phone login option', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByText('手機號碼登入').click();
+    await expect(page.getByPlaceholder('91234567')).toBeVisible();
+  });
+
   // Onboarding tests
   test('should navigate to onboarding', async ({ page }) => {
     await page.goto('/onboarding');
@@ -66,6 +76,11 @@ test.describe('Dinner App', () => {
     await expect(page.getByRole('button', { name: '媽媽' })).toBeVisible();
     await expect(page.getByRole('button', { name: '爸爸' })).toBeVisible();
     await expect(page.getByRole('button', { name: '子女' })).toBeVisible();
+  });
+
+  test('should show join family page', async ({ page }) => {
+    await page.goto('/onboarding/join');
+    await expect(page.getByPlaceholder('ABCD')).toBeVisible();
   });
 
   // Invite page tests
@@ -87,5 +102,10 @@ test.describe('Dinner App', () => {
 
   test('should have login link on landing', async ({ page }) => {
     await expect(page.getByRole('link', { name: '登入' })).toBeVisible();
+  });
+
+  // Footer tests
+  test('should show footer', async ({ page }) => {
+    await expect(page.getByText('私隱政策')).toBeVisible();
   });
 });

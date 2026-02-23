@@ -1,16 +1,16 @@
-# Dinner App - 優化進度 (進行中)
+# Dinner App - 優化進度
 
-## 📊 當前狀態 (2026-02-23 09:25 PST)
+## 📊 當前狀態 (2026-02-23 09:30 PST)
 
 ### ✅ 完成項目
 - CI/CD ✅
-- Unit Tests (8+) ✅  
+- Unit Tests ✅  
 - E2E Tests (14) ✅
 - Auth 修復 ✅
 - UX 優化 ✅
 
-### ⏳ 等待緊你
-- **Supabase Schema** - 去 Supabase Dashboard 執行 SQL
+### ⏳ 等待你執行
+- **Supabase Schema** - 去 Supabase Dashboard → SQL Editor → 貼上 schema.sql → Run
 
 ---
 
@@ -23,13 +23,10 @@
 
 ---
 
-## ✅ 最新改動 (第二輪)
-- 新增更多 unit tests
-- 新增 auth mock tests
-- 14 E2E tests 全部通過
+## 🎯 Ready for Production!
+
+等你去執行 Supabase Schema，然後就可以 merge PR！
 
 ---
 
-## 🔄 持續優化緊
-
-*你可以去執行 Supabase schema 了！*
+*持續優化緊...*

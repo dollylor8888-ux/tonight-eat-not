@@ -4,16 +4,17 @@ import { useMemo, useState, useEffect } from "react";
 import Toast from "@/components/toast";
 import UpsellModal from "@/components/upsell-modal";
 import InviteModal from "@/components/invite-modal";
-import { 
-  initial, 
-  members as initialMembers, 
-  todayResponses,
-  getMembersWithStatus,
-  statusLabel, 
-  statusToken, 
-  type MemberStatus 
-} from "@/lib/mock-data";
-import { loadAppState } from "@/lib/store";
+import { loadAppState, getFamilyMembers } from "@/lib/store";
+
+type MemberStatus = "yes" | "no" | "unknown";
+
+type FamilyMember = {
+  id: string;
+  displayName: string;
+  role: string;
+  isOwner: boolean;
+  joinedAt: string;
+};
 
 function statusClasses(status: MemberStatus) {
   if (status === "yes") {
@@ -25,36 +26,73 @@ function statusClasses(status: MemberStatus) {
   return "bg-[#f2f3f4] text-[#555]";
 }
 
+function initial(name: string) {
+  return name?.slice(0, 1) || "?";
+}
+
+const statusLabel: Record<MemberStatus, string> = {
+  yes: "會",
+  no: "晤會",
+  unknown: "未知",
+};
+
+const statusToken: Record<MemberStatus, string> = {
+  yes: "✅",
+  no: "❌",
+  unknown: "⏰",
+};
+
 export default function TodayPage() {
   // 從 store 讀取用戶狀態
   const [appState, setAppState] = useState<{
     displayName: string | null;
     isOwner: boolean;
     familyId: string | null;
+    memberId: string | null;
   } | null>(null);
   
   const [toast, setToast] = useState("");
   const [showUpsell, setShowUpsell] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   
-  // 合併成員 + 今日回覆
-  const [localResponses, setLocalResponses] = useState(todayResponses);
+  // 家庭成員列表
+  const [members, setMembers] = useState<FamilyMember[]>([]);
   
-  const membersWithStatus = useMemo(() => {
-    return getMembersWithStatus(initialMembers, localResponses);
-  }, [localResponses]);
+  // 今日回覆（從 localStorage 讀取）
+  const [responses, setResponses] = useState<Record<string, MemberStatus>>({});
 
-  // 用 store 度既 displayName 覆蓋
+  // 加載數據
   useEffect(() => {
     const state = loadAppState();
-    if (state.displayName) {
-      // 更新 member 既 displayName
-      initialMembers[0].displayName = state.displayName;
-      initialMembers[0].isOwner = state.isOwner;
-    }
     setAppState(state);
+    
+    // 讀取成員列表
+    if (state.familyId) {
+      const familyMembers = getFamilyMembers(state.familyId);
+      setMembers(familyMembers);
+      
+      // 讀取今日回覆
+      const responseKey = `dinner_responses_${state.familyId}_${getTodayDate()}`;
+      const storedResponses = localStorage.getItem(responseKey);
+      if (storedResponses) {
+        try {
+          setResponses(JSON.parse(storedResponses));
+        } catch (e) {
+          console.error("Failed to parse responses:", e);
+        }
+      }
+    }
   }, []);
 
+  // 合併成員 + 回覆狀態
+  const membersWithStatus = useMemo(() => {
+    return members.map(m => ({
+      ...m,
+      status: responses[m.id] || "unknown",
+    }));
+  }, [members, responses]);
+
+  // 統計
   const counts = useMemo(() => {
     return {
       yes: membersWithStatus.filter((item) => item.status === "yes").length,
@@ -71,19 +109,118 @@ export default function TodayPage() {
     ? "1/1 人" 
     : `${counts.unknown}人未回覆`;
 
+  // 保存回覆到 localStorage 同 history
+  function saveResponseToHistory(date: string, memberId: string, status: MemberStatus) {
+    if (!appState?.familyId) return;
+    
+    const historyKey = `dinner_history_${appState.familyId}`;
+    let history: any[] = [];
+    
+    // 讀取現有 history
+    const stored = localStorage.getItem(historyKey);
+    if (stored) {
+      try {
+        history = JSON.parse(stored);
+      } catch (e) {
+        history = [];
+      }
+    }
+    
+    // 搵到今日既 record
+    let todayRecord = history.find((r: any) => r.date === date);
+    
+    if (!todayRecord) {
+      // Create new record for today
+      const [year, month, day] = date.split("-");
+      const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+      const weekDay = weekDays[new Date(date).getDay()];
+      
+      todayRecord = {
+        id: `hist_${date}`,
+        date: date,
+        label: `${parseInt(month)}/${parseInt(day)}（${weekDay}）`,
+        yes: 0,
+        no: 0,
+        unknown: 0,
+      };
+      history.push(todayRecord);
+    }
+    
+    // 讀取之前既 response status (如果有的話)
+    const prevResponsesKey = `dinner_responses_${appState.familyId}_${date}`;
+    let prevResponses: Record<string, MemberStatus> = {};
+    try {
+      const prevStored = localStorage.getItem(prevResponsesKey);
+      if (prevStored) {
+        prevResponses = JSON.parse(prevStored);
+      }
+    } catch (e) {}
+    
+    const prevStatus = prevResponses[memberId] || "unknown";
+    
+    // Update counts: 先減去之前既 status
+    if (prevStatus === "yes") todayRecord.yes--;
+    else if (prevStatus === "no") todayRecord.no--;
+    else if (prevStatus === "unknown") todayRecord.unknown--;
+    
+    // 再加上新既 status
+    if (status === "yes") todayRecord.yes++;
+    else if (status === "no") todayRecord.no++;
+    else if (status === "unknown") todayRecord.unknown++;
+    
+    // 確保數字唔會變負數
+    todayRecord.yes = Math.max(0, todayRecord.yes);
+    todayRecord.no = Math.max(0, todayRecord.no);
+    todayRecord.unknown = Math.max(0, todayRecord.unknown);
+    
+    // 保存 history
+    localStorage.setItem(historyKey, JSON.stringify(history));
+  }
+
+  // 回覆功能
   function reply(status: MemberStatus) {
-    setLocalResponses(prev => ({
-      ...prev,
-      u1: status,
-    }));
+    if (!appState?.memberId) return;
+    
+    // 更新狀態
+    const newResponses = { ...responses, [appState.memberId]: status };
+    setResponses(newResponses);
+    
+    // 保存到 localStorage
+    if (appState.familyId) {
+      const responseKey = `dinner_responses_${appState.familyId}_${getTodayDate()}`;
+      localStorage.setItem(responseKey, JSON.stringify(newResponses));
+      
+      // 保存到 history
+      saveResponseToHistory(getTodayDate(), appState.memberId, status);
+    }
+    
     setToast(`已更新：${statusToken[status]} ${statusLabel[status]}`);
+  }
+
+  // 處理成員加入
+  function handleMemberJoined(name: string) {
+    // 重新加載成員列表
+    if (appState?.familyId) {
+      const familyMembers = getFamilyMembers(appState.familyId);
+      setMembers(familyMembers);
+    }
+    setToast(`${name} 已加入家庭`);
+  }
+
+  // 獲取今日日期
+  function getTodayDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   return (
     <>
       {/* Header with Badge */}
       <div className="flex items-center justify-between">
-        <p className="text-lg font-bold">今晚（2 月 21 日｜五）</p>
+        <p className="text-lg font-bold">今晚（{getTodayDisplay()}）</p>
         <span className={`rounded-full px-2 py-1 text-xs font-medium ${
           onlySelf 
             ? "bg-[#fff3df] text-[#b66d00]" 
@@ -119,6 +256,12 @@ export default function TodayPage() {
             </span>
           </div>
         ))}
+        
+        {members.length === 0 && (
+          <div className="flex h-[60px] items-center justify-center text-[#888]">
+            載入中...
+          </div>
+        )}
       </section>
 
       {/* Single Member Empty State - 香港口吻 */}
@@ -154,7 +297,7 @@ export default function TodayPage() {
       <div className="fixed bottom-[78px] left-0 right-0 z-20 border-t border-[#ececec] bg-white px-4 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <div className="mx-auto grid w-full max-w-md grid-cols-3 gap-2">
           <button onClick={() => reply("yes")} className="tap-feedback h-[52px] rounded-[14px] bg-[#2ecc71] text-base font-bold text-white">✅ 會</button>
-          <button onClick={() => reply("no")} className="tap-feedback h-[52px] rounded-[14px] bg-[#e74c3c] text-base font-bold text-white">❌ 唔會</button>
+          <button onClick={() => reply("no")} className="tap-feedback h-[52px] rounded-[14px] bg-[#e74c3c] text-base font-bold text-white">❌ 晤會</button>
           <button onClick={() => reply("unknown")} className="tap-feedback h-[52px] rounded-[14px] bg-[#7f8c8d] text-base font-bold text-white">⏰ 未知</button>
         </div>
       </div>
@@ -162,9 +305,17 @@ export default function TodayPage() {
       {/* Modals */}
       <Toast message={toast} visible={Boolean(toast)} onClose={() => setToast("")} />
       <UpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} />
-      <InviteModal open={showInvite} onClose={() => setShowInvite(false)} onMemberJoined={(name) => {
-        setToast(`${name} 已加入家庭`);
-      }} />
+      <InviteModal open={showInvite} onClose={() => setShowInvite(false)} onMemberJoined={handleMemberJoined} />
     </>
   );
+}
+
+// 獲取今日顯示
+function getTodayDisplay() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+  const weekDay = weekDays[now.getDay()];
+  return `${month}月 ${day}日（${weekDay}）`;
 }

@@ -9,6 +9,7 @@ export default function CreateFamilyPage() {
   const router = useRouter();
   const [familyName, setFamilyName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState("媽媽");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,10 +26,9 @@ export default function CreateFamilyPage() {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 500));
     
-    // ✅ 保存到 localStorage
-    mockCreateFamily(familyName.trim(), displayName.trim());
+    // 保存到 localStorage（包含 role）
+    mockCreateFamily(familyName.trim(), displayName.trim(), role);
     
-    // P1: 用 useRouter 而非 window.location
     router.push("/app/today");
   }
 
@@ -42,6 +42,7 @@ export default function CreateFamilyPage() {
       <p className="mt-2 text-base text-[#444]">幫你既家庭改名</p>
 
       <section className="mt-6 card p-5 space-y-5">
+        {/* 家庭名稱 */}
         <div>
           <label className="text-[13px] text-[#444]">家庭名稱</label>
           <input
@@ -56,6 +57,7 @@ export default function CreateFamilyPage() {
           <p className="mt-1 text-xs text-[#888]">屋企人會見到呢個名</p>
         </div>
 
+        {/* 你既名稱 */}
         <div>
           <label className="text-[13px] text-[#444]">你既名稱</label>
           <input
@@ -68,6 +70,28 @@ export default function CreateFamilyPage() {
             }}
           />
           <p className="mt-1 text-xs text-[#888]">呢個名會顯示俾其他家庭成員睇</p>
+        </div>
+
+        {/* 你既角色 */}
+        <div>
+          <label className="text-[13px] text-[#444]">你既角色</label>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {["媽媽", "爸爸", "子女", "其他"].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className={`tap-feedback h-10 rounded-lg border text-sm font-medium ${
+                  role === r
+                    ? "border-[#f5b041] bg-[#fff3df] text-[#f5b041]"
+                    : "border-[#ddd] text-[#666]"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-[#888]">你係呢個家庭既邊個角色？</p>
         </div>
 
         {error && <p className="text-[13px] text-[#e74c3c]">{error}</p>}

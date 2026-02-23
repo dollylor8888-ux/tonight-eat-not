@@ -1,47 +1,15 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { loadAppState, verifyInviteCode, mockJoinFamily } from "@/lib/store";
 
 type InviteData = {
   code: string;
   familyName: string;
-  invitedBy: string;
+  familyId: string;
   valid: boolean;
-  expired: boolean;
-};
-
-// Mock data - 實際會從 DB 查詢
-const mockInvites: Record<string, InviteData> = {
-  ABCD: {
-    code: "ABCD",
-    familyName: "陳家",
-    invitedBy: "媽媽",
-    valid: true,
-    expired: false,
-  },
-  EFGH: {
-    code: "EFGH",
-    familyName: "李家",
-    invitedBy: "爸爸",
-    valid: true,
-    expired: false,
-  },
-  EXPIRED: {
-    code: "EXPIRED",
-    familyName: "王家",
-    invitedBy: "阿女",
-    valid: false,
-    expired: true,
-  },
-};
-
-// Mock: 模擬當前登入用戶
-const currentUser = {
-  loggedIn: true,
-  hasFamily: false,
-  familyId: null,
 };
 
 export default function JoinPage({ params }: { params: Promise<{ code: string }> }) {
@@ -52,25 +20,39 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<"confirm" | "form">("confirm");
   const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState("子女");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
 
+  // 檢查登入狀態
+  const state = loadAppState();
+  const isLoggedIn = state.loggedIn;
+  const hasFamily = !!state.familyId;
+
   useEffect(() => {
-    const data = mockInvites[code.toUpperCase()];
-    if (data) {
-      setInvite(data);
+    // 驗證邀請碼
+    const result = verifyInviteCode(code);
+    
+    if (result.valid && result.familyId && result.familyName) {
+      setInvite({
+        code: code.toUpperCase(),
+        familyName: result.familyName,
+        familyId: result.familyId,
+        valid: true,
+      });
+    } else {
+      setInvite(null);
     }
+    
     setLoading(false);
   }, [code]);
 
   // 未登入 → 導去登入
   useEffect(() => {
-    if (!currentUser.loggedIn) {
+    if (!loading && !isLoggedIn) {
       router.push(`/login?next=/j/${code}`);
     }
-  }, [router, code]);
-
-  const alreadyHasFamily = currentUser.hasFamily;
+  }, [router, code, isLoggedIn, loading]);
 
   function handleConfirm() {
     setStep("form");
@@ -82,14 +64,18 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
       return;
     }
 
+    if (!invite) {
+      setError("邀請無效");
+      return;
+    }
+
     setJoining(true);
     
-    // Mock: 調用 API 加入家庭
-    // POST /api/family/join
-    // { code, displayName }
+    // 模擬 API 延遲
     await new Promise((r) => setTimeout(r, 500));
     
-    console.log("加入家庭:", { code, displayName });
+    // 加入家庭（傳入 role 參數）
+    mockJoinFamily(invite.familyId, invite.familyName, displayName, role);
     
     router.push("/app/today");
   }
@@ -127,33 +113,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     );
   }
 
-  // 邀請碼已過期
-  if (invite.expired) {
-    return (
-      <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
-        <h1 className="text-[22px] font-bold">邀請已過期</h1>
-        
-        <section className="mt-6 card p-6 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#fdedec] text-3xl">
-            ⏰
-          </div>
-          <p className="text-[#666]">
-            呢個邀請已經過期。
-          </p>
-          <p className="mt-3 text-sm text-[#888]">
-            請聯絡屋企人重新發送新既邀請。
-          </p>
-          
-          <Link href="/" className="tap-feedback mt-6 inline-block h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white leading-12">
-            返回首頁
-          </Link>
-        </section>
-      </main>
-    );
-  }
-
   // 已經加入過呢個家庭
-  if (alreadyHasFamily) {
+  if (hasFamily) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
         <h1 className="text-[22px] font-bold">你已經係 {invite.familyName} 既成員</h1>
@@ -189,7 +150,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
               你想加入 <span className="text-[#f5b041]">{invite.familyName}</span>
             </p>
             <p className="mt-2 text-sm text-[#666]">
-              由 {invite.invitedBy} 邀請你
+              邀請碼: {invite.code}
             </p>
           </div>
 
@@ -212,7 +173,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     );
   }
 
-  // 填寫資料畫面（無角色選擇）
+  // 填寫資料畫面
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
       <button onClick={() => setStep("confirm")} className="tap-feedback mb-2 text-sm text-[#666]">
@@ -220,12 +181,13 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
       </button>
       
       <h1 className="text-[22px] font-bold">加入 {invite.familyName}</h1>
-      <p className="mt-2 text-base text-[#444]">你既名稱</p>
-
+      
       <section className="mt-4 card p-5 space-y-5">
+        {/* 名稱輸入 */}
         <div>
+          <label className="text-base text-[#444]">你既名稱</label>
           <input
-            className="h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base text-[#212121]"
+            className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base text-[#212121]"
             placeholder="你想其他人點称呼你？"
             value={displayName}
             onChange={(e) => {
@@ -234,6 +196,26 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
             }}
           />
           <p className="mt-1 text-xs text-[#888]">呢個名會顯示俾其他家庭成員睇</p>
+        </div>
+
+        {/* 角色選擇 */}
+        <div>
+          <label className="text-base text-[#444]">你既角色</label>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {["媽媽", "爸爸", "子女", "其他"].map((r) => (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className={`tap-feedback h-10 rounded-lg border text-sm font-medium ${
+                  role === r
+                    ? "border-[#f5b041] bg-[#fff3df] text-[#f5b041]"
+                    : "border-[#ddd] text-[#666]"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && (

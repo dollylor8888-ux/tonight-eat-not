@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { mockLogin, loadAppState } from "@/lib/store";
 
 // Mock: 模擬用戶登入狀態
 type UserState = {
@@ -25,6 +26,18 @@ function LoginContent() {
   
   // Mock: 模擬已登入但未有家庭既狀態
   const [user, setUser] = useState<UserState | null>(null);
+
+  // 檢查是否已經登入
+  useEffect(() => {
+    const state = loadAppState();
+    if (state.loggedIn && state.familyId) {
+      // 已經登入且有家庭 → 直接進 Today
+      router.push("/app/today");
+    } else if (state.loggedIn && !state.familyId) {
+      // 已經登入但冇家庭 → 去 Onboarding
+      router.push("/onboarding");
+    }
+  }, [router]);
 
   useEffect(() => {
     if (step !== "otp" || seconds <= 0) {
@@ -66,6 +79,9 @@ function LoginContent() {
     }
 
     setError("");
+    
+    // ✅ 保存到 localStorage
+    mockLogin(phone);
     
     // Mock: 模擬登入成功
     // 假設呢個電話未有家庭 (hasFamily: false)

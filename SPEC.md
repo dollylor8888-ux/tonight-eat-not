@@ -14,10 +14,11 @@
   1. Splash Screen
   2. OTP Login Screen
   3. Create Family Screen
-  4. Invite Members Screen
-  5. Home Screen (Daily Status)
-  6. History Screen
-  7. Settings Screen
+  4. Join Family Screen (via invite link)
+  5. Invite Members Screen
+  6. Home Screen (Daily Status)
+  7. History Screen
+  8. Settings Screen
 
 ### Visual Design
 
@@ -71,8 +72,13 @@
 - Role selection (媽媽/爸爸/子女/其他)
 - "建立家庭" button
 
+**Join Family (via Invite Link):**
+- Display family name that user is joining
+- Role selection (媽媽/爸爸/子女/其他)
+- "加入家庭" button
+
 **Invite Members:**
-- Display generated invite link
+- Display generated unique invite link
 - Copy link button
 - "輸入電話號碼邀請" option
 - "完成" button
@@ -88,39 +94,80 @@
 - Counter: "今晚共 X 人食飯"
 
 **History Screen:**
-- List of past 7 days
+- Empty state for new users: "暫時未有記錄"
+- List of past days (only shows days with at least one response)
 - Each day shows: date, count of attendees
 - Tap to expand and see details
+- Shows up to last 30 days
 
 **Settings Screen:**
-- Push notification time picker
-- Family members list with management options
-- Account info
+- Push notification time picker (admin only)
+- Family members list with:
+  - Member name and role
+  - Admin badge for creator
+  - Remove button (admin only, cannot remove self)
+- Account info (your phone number)
+- "離開家庭" button (for non-admin members)
 
 ## Functionality Specification
 
 ### Core Features (MVP)
-1. **User Authentication**
-   - Phone OTP login (simulated for demo)
-   - Session persistence
 
-2. **Family Management**
-   - Create family with name and role
-   - Invite members via link or phone
-   - View family members
+#### 1. User Authentication
+- Phone OTP login (simulated for demo)
+- Session persistence via localStorage
 
-3. **Daily Response**
-   - View today's status for all family members
-   - Submit own response (會/唔會/未知)
-   - Real-time update of response count
+#### 2. Family Management
+- Create family with name and role
+- Creator automatically becomes Admin
+- Invite members via unique link
+- Join family via invite link
+- **Admin privileges:**
+  - Remove members (cannot remove self)
+  - Adjust notification time
+  - Invite new members
+- **Member privileges:**
+  - Submit own response
+  - View history
+  - Leave family
 
-4. **History**
-   - View past 7 days responses
-   - See daily attendee counts
+#### 3. Daily Response
+- View today's status for all family members
+- Submit own response (會/晤會/未知)
+- Real-time update of response count
+- Cannot change other members' responses
 
-5. **Settings**
-   - Adjust push notification time (admin only)
-   - Manage family members (admin only)
+#### 4. History
+- Initially empty for new users
+- Only shows days with at least one response
+- Shows last 30 days
+- Expandable details per day
+- Member-by-member breakdown
+
+#### 5. Settings
+- **Admin only:**
+  - Adjust push notification time
+  - Remove family members
+- **All members:**
+  - View family members
+  - View own account info
+  - Leave family (non-admin only)
+
+### Invite Link System
+- Unique invite code generated for each family
+- Link format: `{app-url}/join/{inviteCode}`
+- Link is reusable (not single-use for MVP)
+- When user joins via link:
+  - User enters their name and role
+  - User added to family members list
+  - Redirected to Home screen
+
+### Role System
+
+| 角色 | 權限 |
+|------|------|
+| **Admin (創建者)** | 踢人、調較notification time、邀請成員、睇晒所有野 |
+| **成員** | 自己回覆、睇history、離開家庭 |
 
 ### Demo Data
 Pre-populated with:
@@ -128,17 +175,25 @@ Pre-populated with:
 - Members: 媽媽, 爸爸, 阿仔
 - Today's responses partially filled for demonstration
 
+**Note:** New users who create their own family will have empty history initially.
+
 ## Technical Stack
 - **Framework:** Next.js 14 (App Router)
 - **Styling:** Tailwind CSS
 - **State:** React useState/useContext
+- **Storage:** localStorage for persistence
 - **Mock Data:** Static JSON for demo
 
 ## Acceptance Criteria
 1. ✅ iPhone mockup displays correctly on desktop
-2. ✅ All 7 screens are navigable
+2. ✅ All 8 screens are navigable
 3. ✅ Response buttons update the UI immediately
 4. ✅ Member count updates when responses change
 5. ✅ Smooth transitions between screens
 6. ✅ Works on both desktop and mobile browsers
 7. ✅ Bilingual support: Chinese UI throughout
+8. ✅ New users have empty history initially
+9. ✅ Invite link works to join family
+10. ✅ Admin can remove members
+11. ✅ Admin cannot remove themselves
+12. ✅ Non-admin members can leave family

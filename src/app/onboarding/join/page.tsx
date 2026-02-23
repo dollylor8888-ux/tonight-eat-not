@@ -27,6 +27,7 @@ export default function JoinFamilyPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
   const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState("子女");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -67,10 +68,9 @@ export default function JoinFamilyPage() {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 500));
     
-    // ✅ 保存到 localStorage（傳入真正既 familyId）
-    mockJoinFamily(inviteInfo!.familyId, inviteInfo!.familyName, displayName.trim());
+    // ✅ 保存到 localStorage（傳入 role 參數）
+    mockJoinFamily(inviteInfo!.familyId, inviteInfo!.familyName, displayName.trim(), role);
     
-    // P1: 用 useRouter 而非 window.location
     router.push("/app/today");
   }
 
@@ -156,12 +156,13 @@ export default function JoinFamilyPage() {
       </button>
       
       <h1 className="mt-2 text-[22px] font-bold">加入 {inviteInfo?.familyName}</h1>
-      <p className="mt-2 text-base text-[#444]">你既名稱</p>
-
-      <section className="mt-6 card p-5 space-y-5">
+      
+      <section className="mt-4 card p-5 space-y-5">
+        {/* 名稱 */}
         <div>
+          <label className="text-[13px] text-[#444]">你既名稱</label>
           <input
-            className="h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base text-[#212121]"
+            className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base text-[#212121]"
             placeholder="你想其他人點稱呼你？"
             value={displayName}
             onChange={(e) => {
@@ -170,6 +171,27 @@ export default function JoinFamilyPage() {
             }}
           />
           <p className="mt-1 text-xs text-[#888]">呢個名會顯示俾其他家庭成員睇</p>
+        </div>
+
+        {/* 角色 */}
+        <div>
+          <label className="text-[13px] text-[#444]">你既角色</label>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {["媽媽", "爸爸", "子女", "其他"].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                className={`tap-feedback h-10 rounded-lg border text-sm font-medium ${
+                  role === r
+                    ? "border-[#f5b041] bg-[#fff3df] text-[#f5b041]"
+                    : "border-[#ddd] text-[#666]"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && (

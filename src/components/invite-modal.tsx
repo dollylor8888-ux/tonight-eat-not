@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadAppState } from "@/lib/store";
+import { loadAppState, getInviteCode } from "@/lib/store";
 
 type InviteModalProps = {
   open: boolean;
@@ -13,18 +13,25 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
   const [familyName, setFamilyName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   
-  const inviteCode = "ABCD";
-  const link = `https://dinner.hk/j/${inviteCode}`;
-  const shareText = `加入我哋既家庭「${familyName}」，一齊今晚食唔食！🍚`;
-
-  // 從 store 讀取家庭名稱
+  // 從 store 讀取家庭資料
   useEffect(() => {
     if (open) {
       const state = loadAppState();
       setFamilyName(state.familyName || "屋企人");
+      
+      // 獲取邀請碼
+      if (state.familyId) {
+        const code = getInviteCode(state.familyId);
+        setInviteCode(code || "");
+      }
     }
   }, [open]);
+
+  // 邀請連結
+  const link = inviteCode ? `https://dinner.hk/j/${inviteCode}` : "";
+  const shareText = inviteCode ? `加入我哋既家庭「${familyName}」，一齊今晚食唔食！🍚 ${link}` : "";
 
   if (!open) return null;
 
@@ -40,7 +47,7 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
         setShared(true);
         setTimeout(() => setShared(false), 2000);
       } else {
-        await navigator.clipboard.writeText(`${shareText} ${link}`);
+        await navigator.clipboard.writeText(shareText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }
@@ -55,12 +62,6 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }
-
-  // Mock: 模擬有人加入（測試用）
-  function simulateJoin() {
-    onMemberJoined?.("阿仔");
-    onClose();
   }
 
   return (
@@ -95,8 +96,11 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
         <div className="mt-4">
           <p className="text-[13px] text-[#444]">邀請連結</p>
           <p className="mt-1 rounded-lg bg-[#f7f7f7] px-3 py-3 text-sm text-[#666] break-all">
-            {link}
+            {link || "載入中..."}
           </p>
+          {inviteCode && (
+            <p className="mt-1 text-xs text-[#888]">邀請碼: {inviteCode}</p>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -104,7 +108,8 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
           {/* Primary: Share */}
           <button
             onClick={onShare}
-            className="tap-feedback flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[#25D366] text-base font-bold text-white"
+            disabled={!inviteCode}
+            className="tap-feedback flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[#25D366] text-base font-bold text-white disabled:opacity-50"
           >
             {shared ? "✅ 已分享" : "📤 一鍵分享到 WhatsApp"}
           </button>
@@ -112,19 +117,12 @@ export default function InviteModal({ open, onClose, onMemberJoined }: InviteMod
           {/* Secondary: Copy */}
           <button
             onClick={onCopy}
-            className="tap-feedback flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#ddd] bg-white text-base font-semibold text-[#333]"
+            disabled={!inviteCode}
+            className="tap-feedback flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#ddd] bg-white text-base font-semibold text-[#333] disabled:opacity-50"
           >
             {copied ? "✅ 已複製" : "📋 複製連結"}
           </button>
         </div>
-
-        {/* Dev: Simulate Join (remove in production) */}
-        <button
-          onClick={simulateJoin}
-          className="tap-feedback mt-4 w-full text-center text-xs text-[#999]"
-        >
-          [開發者測試] 模擬有人加入
-        </button>
       </div>
     </div>
   );

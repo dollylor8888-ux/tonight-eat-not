@@ -16,6 +16,16 @@ export type AppState = {
   memberId: string | null;
   displayName: string | null;
   isOwner: boolean;
+  role: string | null;
+};
+
+// 成員類型
+export type FamilyMember = {
+  id: string;
+  displayName: string;
+  role: string;
+  isOwner: boolean;
+  joinedAt: string;
 };
 
 const STORAGE_KEY = "dinner_app_state_v1";
@@ -29,6 +39,7 @@ const defaultState: AppState = {
   memberId: null,
   displayName: null,
   isOwner: false,
+  role: null,
 };
 
 export function loadAppState(): AppState {
@@ -83,36 +94,164 @@ export function mockLogin(phone: string): AppState {
     memberId: null,
     displayName: null,
     isOwner: false,
+    role: null,
   });
 }
 
-// 模擬建立家庭（修正：P0 保留 loggedIn/phone，P2 用 crypto.randomUUID）
-export function mockCreateFamily(familyName: string, displayName: string): AppState {
+// 模擬建立家庭
+export function mockCreateFamily(familyName: string, displayName: string, role: string): AppState {
   const cur = loadAppState();
-  const familyId = "fam_" + crypto.randomUUID();
-  const memberId = "mem_" + crypto.randomUUID();
+  const familyId = "fam_" + crypto.randomUUID().slice(0, 8);
+  const memberId = "mem_" + crypto.randomUUID().slice(0, 8);
+  
+  // 建立家庭成員列表（自己）
+  const members: FamilyMember[] = [
+    {
+      id: memberId,
+      displayName: displayName,
+      role: role,
+      isOwner: true,
+      joinedAt: new Date().toISOString(),
+    }
+  ];
+  
+  // 保存成員到 localStorage
+  if (typeof window !== "undefined") {
+    const membersKey = `dinner_members_${familyId}`;
+    localStorage.setItem(membersKey, JSON.stringify(members));
+    
+    // 生成邀請碼
+    const inviteCode = generateInviteCode();
+    const inviteKey = `dinner_invite_${familyId}`;
+    localStorage.setItem(inviteKey, JSON.stringify({
+      code: inviteCode,
+      familyId,
+      familyName,
+      createdBy: memberId,
+      createdAt: new Date().toISOString(),
+    }));
+  }
   
   return saveAppState({
-    loggedIn: true,           // P0: 確保登入狀態
-    phone: cur.phone,          // P0: 保留電話
+    loggedIn: true,
+    phone: cur.phone,
     familyId,
     familyName,
     memberId,
     displayName,
     isOwner: true,
+    role,
   });
 }
 
-// 模擬加入家庭（P2 用 crypto.randomUUID）
-export function mockJoinFamily(familyId: string, familyName: string, displayName: string): AppState {
-  const memberId = "mem_" + crypto.randomUUID();
+// 模擬加入家庭
+export function mockJoinFamily(familyId: string, familyName: string, displayName: string, role: string): AppState {
+  const cur = loadAppState();
+  const memberId = "mem_" + crypto.randomUUID().slice(0, 8);
+  
+  // 加入成員到 localStorage
+  if (typeof window !== "undefined") {
+    const membersKey = `dinner_members_${familyId}`;
+    const existingMembers = localStorage.getItem(membersKey);
+    
+    let members: FamilyMember[] = [];
+    if (existingMembers) {
+      try {
+        members = JSON.parse(existingMembers);
+      } catch (e) {
+        members = [];
+      }
+    }
+    
+    // 新增新成員
+    members.push({
+      id: memberId,
+      displayName: displayName,
+      role: role,
+      isOwner: false,
+      joinedAt: new Date().toISOString(),
+    });
+    
+    localStorage.setItem(membersKey, JSON.stringify(members));
+  }
   
   return saveAppState({
-    loggedIn: true,           // P0: 確保登入狀態
+    loggedIn: true,
+    phone: cur.phone,
     familyId,
     familyName,
     memberId,
     displayName,
     isOwner: false,
+    role,
   });
+}
+
+// 生成邀請碼
+function generateInviteCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// 獲取邀請碼
+export function getInviteCode(familyId: string): string | null {
+  if (typeof window === "undefined") return null;
+  
+  const inviteKey = `dinner_invite_${familyId}`;
+  const stored = localStorage.getItem(inviteKey);
+  
+  if (stored) {
+    try {
+      const data = JSON.parse(stored);
+      return data.code;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+
+// 驗證邀請碼
+export function verifyInviteCode(code: string): { valid: boolean; familyId?: string; familyName?: string } {
+  if (typeof window === "undefined") {
+    return { valid: false };
+  }
+  
+  // 搵所有invite key
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("dinner_invite_")) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key)!);
+        if (data.code === code.toUpperCase()) {
+          return { valid: true, familyId: data.familyId, familyName: data.familyName };
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+  
+  return { valid: false };
+}
+
+// 獲取家庭成員
+export function getFamilyMembers(familyId: string): FamilyMember[] {
+  if (typeof window === "undefined") return [];
+  
+  const membersKey = `dinner_members_${familyId}`;
+  const stored = localStorage.getItem(membersKey);
+  
+  if (stored) {
+    try {
+      return JSON.parse(stored) as FamilyMember[];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
 }

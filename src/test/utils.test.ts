@@ -1,28 +1,53 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-describe('Auth Functions', () => {
+describe('Utils', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
   });
 
-  describe('getAppBaseUrl', () => {
-    it('should return localhost in dev', async () => {
-      const { getAppBaseUrl } = await import('../lib/utils');
+  describe('getInviteLink', () => {
+    it('should generate invite link with code', async () => {
+      const { getInviteLink } = await import('../lib/utils');
       
-      const url = getAppBaseUrl();
+      const link = getInviteLink('ABC123');
       
-      // Should contain localhost
-      expect(url).toBeTruthy();
+      expect(link).toContain('/j/ABC123');
     });
 
-    it('should use NEXT_PUBLIC_APP_URL if set', async () => {
-      // This would require mocking process.env
+    it('should use different base URL in dev', async () => {
+      // Mock window.location
+      Object.defineProperty(window, 'location', {
+        value: { hostname: 'localhost', port: '3000' },
+        writable: true,
+      });
+      
+      const { getInviteLink } = await import('../lib/utils');
+      
+      const link = getInviteLink('ABC123');
+      
+      expect(link).toContain('localhost');
+      
+      Object.defineProperty(window, 'location', { value: {}, writable: true });
+    });
+
+    it('should handle empty code', async () => {
+      const { getInviteLink } = await import('../lib/utils');
+      
+      const link = getInviteLink('');
+      
+      expect(link).toBe('/j/');
+    });
+  });
+
+  describe('getAppBaseUrl', () => {
+    it('should return a valid URL', async () => {
       const { getAppBaseUrl } = await import('../lib/utils');
       
       const url = getAppBaseUrl();
       
       expect(url).toBeTruthy();
+      expect(url.startsWith('http')).toBe(true);
     });
   });
 });

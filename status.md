@@ -1,13 +1,20 @@
-# Dinner App - 優化進度
+# Dinner App - Code Review Fixes
 
-## 📊 當前狀態 (2026-02-24)
+## 📊 進度 (2026-02-24)
 
-### ✅ 完成項目
-- CI/CD Pipeline ✅
-- Unit Tests ✅  
-- E2E Tests (26 tests) ✅
-- Auth 修復 ✅
-- Supabase Schema ✅
+### ✅ Codex Review - Critical & High Issues Fixed
+
+| Issue | Status | File |
+|-------|--------|------|
+| AppGuard bypass vulnerability | ✅ Fixed | app-guard.tsx |
+| Hardcoded Supabase credentials | ✅ Fixed + Warning | supabase.ts |
+| Add-to-Home-Screen modal bug | ✅ Fixed | add-to-homescreen.tsx |
+| Response identity mismatch | ✅ Fixed | auth.ts, today/page.tsx |
+
+### 🔄 In Progress
+- Medium issues
+- Performance improvements
+- Missing features
 
 ---
 
@@ -20,16 +27,16 @@
 
 ---
 
-## ✅ 最新改動
-- 新增 8 個 Login/Signup E2E tests
-- 總共 26 個 E2E tests 全部通過
-- 修復登錄表單測試
+## 📝 Fixed Issues Summary
 
----
+### Critical
+1. ✅ AppGuard now properly checks login/family status
+2. ✅ Supabase config shows warning when using fallback
 
-## 🎯 Ready for PR!
-
-CI 全部綠燈！
+### High  
+3. ✅ Add-to-Home-Screen modal now shows for button variant
+4. ✅ Response now keyed by memberId (not userId)
+5. ✅ submitResponse uses memberId consistently
 
 ---
 

@@ -209,8 +209,10 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     );
   }
 
-  // 已經加入過呢個家庭
-  if (hasFamily) {
+  // 已經加入過呢個家庭 (檢查是否已加入這個特定的家庭)
+  const isAlreadyMember = hasFamily && invite?.familyId === state.familyId;
+  
+  if (isAlreadyMember) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
         <h1 className="text-[22px] font-bold">你已經係 {invite.familyName} 既成員</h1>

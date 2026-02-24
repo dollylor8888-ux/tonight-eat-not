@@ -523,3 +523,81 @@ export async function getInviteCodeSupabase(familyId: string): Promise<string | 
 export function syncToLocalStorage(appState: AppState): void {
   saveAppState(appState);
 }
+
+// ============================================
+// Phone OTP 登錄 (使用 Supabase Auth)
+// ============================================
+
+// 發送 OTP 到手機
+export async function sendPhoneOtp(phone: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    // Format phone to E.164 format (香港 +852)
+    const formattedPhone = phone.startsWith('+') ? phone : `+852${phone}`;
+    
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: formattedPhone,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// 驗證 OTP
+export async function verifyPhoneOtp(phone: string, otp: string): Promise<{ user: AuthUser | null; error: string | null }> {
+  try {
+    // Format phone to E.164 format
+    const formattedPhone = phone.startsWith('+') ? phone : `+852${phone}`;
+    
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: formattedPhone,
+      token: otp,
+      type: 'sms',
+    });
+
+    if (error) {
+      return { user: null, error: error.message };
+    }
+
+    if (data.user) {
+      // 確保用戶資料存在於 users 表
+      await ensureUserProfile(data.user.id, null, formattedPhone);
+      
+      const user: AuthUser = {
+        id: data.user.id,
+        email: null,
+        phone: formattedPhone,
+        displayName: null,
+      };
+      
+      return { user, error: null };
+    }
+
+    return { user: null, error: 'Verification failed' };
+  } catch (err: any) {
+    return { user: null, error: err.message };
+  }
+}
+
+// 確保用戶資料存在
+async function ensureUserProfile(userId: string, email: string | null, phone: string | null): Promise<void> {
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', userId)
+    .single();
+
+  if (!existing) {
+    await supabase.from('users').insert({
+      id: userId,
+      email,
+      phone,
+      display_name: phone?.replace('+852', '') || 'User',
+    });
+  }
+}

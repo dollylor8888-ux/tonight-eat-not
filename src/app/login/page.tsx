@@ -11,6 +11,8 @@ import {
   createFamily,
   joinFamilyByCode,
   getUserFamily,
+  sendPhoneOtp,
+  verifyPhoneOtp,
   AuthUser,
   Family,
   FamilyMember
@@ -107,8 +109,19 @@ function LoginContent() {
       return;
     }
     setError("");
-    setStep("otp");
-    setOtpSeconds(60);
+    setLoading(true);
+    
+    // 使用 Supabase 發送 OTP
+    sendPhoneOtp(phone).then(result => {
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+      } else {
+        setStep("otp");
+        setOtpSeconds(60);
+        setLoading(false);
+      }
+    });
   }
 
   async function verifyOtp() {
@@ -120,34 +133,36 @@ function LoginContent() {
     setLoading(true);
     setError("");
     
-    // Mock: 模擬 OTP 驗證成功
-    // 實際應該打 API 驗證
-    await new Promise(r => setTimeout(r, 500));
+    // 使用 Supabase 驗證 OTP
+    const result = await verifyPhoneOtp(phone, otp);
     
-    const mockUser: AuthUser = {
-      id: "phone_" + phone,
-      email: null,
-      phone: "+852" + phone,
-      displayName: null,
-    };
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
     
-    setUser(mockUser);
-    
-    // 模擬 localStorage 保存 (實際會用 Supabase)
-    saveAppState({
-      loggedIn: true,
-      phone: mockUser.phone,
-      familyId: null,
-      familyName: null,
-      memberId: null,
-      displayName: null,
-      isOwner: false,
-      role: null,
-      userId: mockUser.id,
-    });
-    
-    setLoading(false);
-    router.push("/onboarding");
+    if (result.user) {
+      setUser(result.user);
+      saveAppState({
+        loggedIn: true,
+        phone: result.user.phone,
+        email: result.user.email,
+        familyId: null,
+        familyName: null,
+        memberId: null,
+        displayName: result.user.displayName,
+        isOwner: false,
+        role: null,
+        userId: result.user.id,
+      });
+      
+      setLoading(false);
+      router.push("/onboarding");
+    } else {
+      setError("驗證失敗");
+      setLoading(false);
+    }
   }
 
   // ==================== Email Login ====================

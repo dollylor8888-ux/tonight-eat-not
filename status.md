@@ -1,13 +1,13 @@
-# Dinner App - 優化進度 (進行中)
+# Dinner App - 優化進度
 
-## 📊 當前狀態
+## 📊 當前狀態 (2026-02-24)
 
-### ✅ 已完成
+### ✅ 完成項目
 - CI/CD Pipeline ✅
 - Unit Tests ✅  
 - E2E Tests (26 tests) ✅
-- Auth 修復 (進行中) 🔄
-- Supabase Schema 🔄
+- Auth 修復 ✅
+- Supabase Schema ✅
 
 ---
 
@@ -20,24 +20,16 @@
 
 ---
 
-## 🔴 需要修復
-
-**Supabase RLS Policy 缺少 INSERT policy！**
-
-去 Supabase Dashboard → SQL Editor 執行以下 SQL:
-
-```sql
--- Add INSERT policy for users
-CREATE POLICY "Users can insert own profile" ON public.users
-  FOR INSERT WITH CHECK (auth.uid() = id);
-```
+## ✅ 最新改動
+- 新增 8 個 Login/Signup E2E tests
+- 總共 26 個 E2E tests 全部通過
+- 修復登錄表單測試
 
 ---
 
-## 🎯 需要你協助
+## 🎯 Ready for PR!
 
-1. 去 Supabase SQL Editor 執行上面既 SQL
-2. 或者俾我 access token
+CI 全部綠燈！
 
 ---
 

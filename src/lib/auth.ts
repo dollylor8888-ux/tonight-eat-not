@@ -59,7 +59,12 @@ export async function signUpWithEmail(
 
     if (data.user) {
       // 在 users 表創建記錄
-      await createUserProfile(data.user.id, email, null, displayName || email.split('@')[0]);
+      const profileCreated = await createUserProfile(data.user.id, email, null, displayName || email.split('@')[0]);
+      
+      if (!profileCreated) {
+        // Profile creation failed but auth succeeded - still return user
+        console.warn('User created but profile creation failed');
+      }
       
       const user: AuthUser = {
         id: data.user.id,
@@ -178,7 +183,7 @@ export async function createFamily(
 ): Promise<{ family: Family | null; member: FamilyMember | null; error: string | null }> {
   try {
     // 生成邀請碼
-    const inviteCode = generateInviteCode();
+    const inviteCode = await generateInviteCodeWithRetry();
     
     // 創建家庭
     const { data: family, error: familyError } = await supabase
@@ -450,14 +455,34 @@ export async function submitResponse(
   return { success: true, error: null };
 }
 
-// 生成邀請碼
-function generateInviteCode(): string {
+// 生成邀請碼 (with collision retry)
+async function generateInviteCodeWithRetry(maxRetries = 3): Promise<string> {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if code already exists
+    const { data, error } = await supabase
+      .from('families')
+      .select('id')
+      .eq('invite_code', code)
+      .single();
+    
+    if (error || !data) {
+      // Code is unique, return it
+      return code;
+    }
+    
+    // Code exists, try again
+    console.warn(`Invite code collision, retrying (${attempt + 1}/${maxRetries})`);
   }
-  return code;
+  
+  // Fallback: use timestamp-based code
+  return `INV${Date.now().toString(36).toUpperCase()}`;
 }
 
 // 驗證邀請碼

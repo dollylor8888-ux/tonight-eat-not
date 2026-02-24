@@ -154,10 +154,13 @@ export default function TodayPage() {
     let todayRecord = history.find((r: any) => r.date === date);
     
     if (!todayRecord) {
-      // Create new record for today
+      // Create new record for today - initialize counts based on members
       const [year, month, day] = date.split("-");
       const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
       const weekDay = weekDays[new Date(date).getDay()];
+      
+      // Count total members
+      const totalMembers = members.length;
       
       todayRecord = {
         id: `hist_${date}`,
@@ -165,7 +168,7 @@ export default function TodayPage() {
         label: `${parseInt(month)}/${parseInt(day)}（${weekDay}）`,
         yes: 0,
         no: 0,
-        unknown: 0,
+        unknown: totalMembers, // Start with all as unknown
       };
       history.push(todayRecord);
     }
@@ -182,10 +185,10 @@ export default function TodayPage() {
     
     const prevStatus = prevResponses[memberId] || "unknown";
     
-    // Update counts: 先減去之前既 status
-    if (prevStatus === "yes") todayRecord.yes--;
-    else if (prevStatus === "no") todayRecord.no--;
-    else if (prevStatus === "unknown") todayRecord.unknown--;
+    // Update counts: 先減去之前既 status (only if it was counted)
+    if (prevStatus === "yes" && todayRecord.yes > 0) todayRecord.yes--;
+    else if (prevStatus === "no" && todayRecord.no > 0) todayRecord.no--;
+    else if (prevStatus === "unknown" && todayRecord.unknown > 0) todayRecord.unknown--;
     
     // 再加上新既 status
     if (status === "yes") todayRecord.yes++;

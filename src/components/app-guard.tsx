@@ -18,17 +18,25 @@ export default function AppGuard({ children }: { children: React.ReactNode }) {
     
     const s = loadAppState();
     const nextParam = searchParams.get("next");
+    const isJoinPage = nextParam?.startsWith("/j/");
     
-    // 如果緊係去緊 join 頁面，唔好 guard 走
-    if (nextParam?.startsWith("/j/")) {
+    // Case 1: Not logged in
+    if (!s.loggedIn) {
+      // Allow join page to show (will redirect to login inside the page)
+      if (isJoinPage) {
+        return;
+      }
+      router.replace("/login");
       return;
     }
     
-    if (!s.loggedIn) {
-      router.replace("/login");
-    } else if (!s.familyId) {
+    // Case 2: Logged in but no family
+    if (!s.familyId) {
       router.replace("/onboarding");
+      return;
     }
+    
+    // Case 3: Logged in with family - always allow
   }, [router, mounted, searchParams]);
 
   return <>{children}</>;

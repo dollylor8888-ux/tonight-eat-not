@@ -61,12 +61,21 @@ export default function AddToHomeScreen({ variant = "inline" }: AddToHomeScreenP
   // Button variant - compact button
   if (variant === "button") {
     return (
-      <button
-        onClick={() => setShowInstructions(true)}
-        className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-[#f5b041] bg-[#fff3df] px-4 py-2 text-sm font-semibold text-[#b66d00]"
-      >
-        📱 加到主畫面
-      </button>
+      <>
+        <button
+          onClick={() => setShowInstructions(true)}
+          className="tap-feedback inline-flex items-center gap-2 rounded-xl border border-[#f5b041] bg-[#fff3df] px-4 py-2 text-sm font-semibold text-[#b66d00]"
+        >
+          📱 加到主畫面
+        </button>
+        {showInstructions && (
+          <AddToHomeScreenInstructions 
+            onClose={() => setShowInstructions(false)} 
+            isIOS={isIOS}
+            isAndroid={isAndroid}
+          />
+        )}
+      </>
     );
   }
 

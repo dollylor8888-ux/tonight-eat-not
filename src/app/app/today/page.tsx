@@ -209,10 +209,10 @@ export default function TodayPage() {
     const newResponses = { ...responses, [appState.memberId]: status };
     setResponses(newResponses);
     
-    // 嘗試使用 Supabase
-    if (appState.familyId && appState.userId) {
+    // 嘗試使用 Supabase (使用 memberId)
+    if (appState.familyId && appState.memberId) {
       try {
-        await submitResponseSupabase(appState.familyId, appState.userId, status);
+        await submitResponseSupabase(appState.familyId, appState.memberId, status);
       } catch (err) {
         console.log("Supabase not available, using localStorage only");
       }

@@ -381,13 +381,17 @@ export async function getFamilyMembers(familyId: string): Promise<FamilyMember[]
   })) || [];
 }
 
-// 獲取今日回覆
+// 獲取今日回覆 (使用 memberId 作為 key)
 export async function getTodayResponses(familyId: string): Promise<Record<string, string>> {
   const today = new Date().toISOString().split('T')[0];
   
+  // Join with family_members to get memberId
   const { data, error } = await supabase
     .from('daily_responses')
-    .select('user_id, status')
+    .select(`
+      status,
+      family_members!inner(id)
+    `)
     .eq('family_id', familyId)
     .eq('date', today);
 
@@ -398,25 +402,40 @@ export async function getTodayResponses(familyId: string): Promise<Record<string
 
   const responses: Record<string, string> = {};
   data?.forEach(r => {
-    responses[r.user_id] = r.status;
+    // Use member.id as the key
+    const memberId = (r.family_members as any)?.id;
+    if (memberId) {
+      responses[memberId] = r.status;
+    }
   });
 
   return responses;
 }
 
-// 提交回覆
+// 提交回覆 (使用 memberId)
 export async function submitResponse(
   familyId: string,
-  userId: string,
+  memberId: string,
   status: 'yes' | 'no' | 'unknown'
 ): Promise<{ success: boolean; error: string | null }> {
   const today = new Date().toISOString().split('T')[0];
+  
+  // First get the user_id from the member
+  const { data: member, error: memberError } = await supabase
+    .from('family_members')
+    .select('user_id')
+    .eq('id', memberId)
+    .single();
+    
+  if (memberError || !member) {
+    return { success: false, error: 'Member not found' };
+  }
   
   const { error } = await supabase
     .from('daily_responses')
     .upsert({
       family_id: familyId,
-      user_id: userId,
+      user_id: member.user_id,
       date: today,
       status: status,
       updated_at: new Date().toISOString(),

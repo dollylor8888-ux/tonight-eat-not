@@ -74,6 +74,13 @@ CREATE POLICY "Users can view own profile" ON public.users
 CREATE POLICY "Users can update own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
 
+CREATE POLICY "Users can insert own profile" ON public.users
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Allow service role to manage users (for initial setup)
+CREATE POLICY "Service role can manage users" ON public.users
+  FOR ALL USING (auth.jwt()->>'role' = 'service_role');
+
 -- Families: 家庭成員可以讀取家庭資料
 CREATE POLICY "Family members can view families" ON public.families
   FOR SELECT USING (

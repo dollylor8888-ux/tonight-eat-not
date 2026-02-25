@@ -486,13 +486,13 @@ export async function verifyInviteCode(code: string): Promise<{ valid: boolean; 
       return { valid: false };
     }
 
-    // 檢查是否已過期
+    // 檢查是否已過期 (如果 expires_at 存在)
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
       console.log("Invite expired");
       return { valid: false };
     }
 
-    // 檢查是否已使用
+    // 檢查是否已使用 (如果 used_at 存在)
     if (invite.used_at) {
       console.log("Invite already used");
       return { valid: false };

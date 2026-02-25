@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loadAppState, saveAppState } from "@/lib/store";
@@ -13,7 +13,28 @@ export default function CreateFamilyPage() {
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState("媽媽");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Check auth on page load
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      
+      // Load display name from user metadata
+      if (user.user_metadata?.display_name) {
+        setDisplayName(user.user_metadata.display_name);
+      }
+      
+      setLoading(false);
+    }
+    
+    checkAuth();
+  }, [router]);
 
   async function handleCreate() {
     if (!familyName.trim()) {

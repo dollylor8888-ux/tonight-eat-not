@@ -1,8 +1,49 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { loadAppState } from "@/lib/store";
 
 export default function OnboardingPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  // Check auth on page load
+  useEffect(() => {
+    async function checkAuth() {
+      // Check localStorage first
+      const state = loadAppState();
+      
+      // Then verify with Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      
+      // If already has family, redirect to today
+      if (state.familyId) {
+        router.push("/app/today");
+        return;
+      }
+      
+      setLoading(false);
+    }
+    
+    checkAuth();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10 flex items-center justify-center">
+        <p className="text-[#666]">載入中...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
       <h1 className="text-[22px] font-bold">建立你既家庭</h1>

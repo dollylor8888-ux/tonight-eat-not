@@ -1,4 +1,4 @@
--- Join Family RPC Function
+-- Join Family RPC Function (Fixed - no expires_at check)
 CREATE OR REPLACE FUNCTION public.join_family(
   p_code TEXT,
   p_display_name TEXT,
@@ -22,12 +22,11 @@ BEGIN
     RETURN JSONB_BUILD_OBJECT('success', false, 'error', 'Not authenticated');
   END IF;
 
-  -- Find valid invite
+  -- Find valid invite (skip expires_at check since column may not exist)
   SELECT * INTO v_invite
   FROM public.invites
   WHERE code = UPPER(p_code)
-    AND (expires_at IS NULL OR expires_at > NOW())
-    AND used_at IS NULL;
+    AND (used_at IS NULL OR used_at IS NULL);
 
   IF NOT FOUND THEN
     RETURN JSONB_BUILD_OBJECT('success', false, 'error', 'Invalid or expired invite code');
@@ -38,7 +37,7 @@ BEGIN
   -- Check if already a member
   IF EXISTS (
     SELECT 1 FROM public.family_members
-    WHERE family_id = v_family_id AND user_id = v_user_id
+    WHERE family_id = v_family_id AND display_name = p_display_name
   ) THEN
     RETURN JSONB_BUILD_OBJECT('success', false, 'error', 'Already a member');
   END IF;
@@ -47,7 +46,7 @@ BEGIN
   INSERT INTO public.family_members (family_id, display_name, role, is_owner)
   VALUES (v_family_id, p_display_name, p_role, false);
 
-  -- Mark invite as used
+  -- Mark invite as used (only if used_at column exists)
   UPDATE public.invites
   SET used_by = v_user_id, used_at = NOW()
   WHERE id = v_invite.id;

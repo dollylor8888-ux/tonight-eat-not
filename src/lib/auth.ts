@@ -471,20 +471,36 @@ async function generateInviteCodeWithRetry(maxRetries = 3): Promise<string> {
 
 // 驗證邀請碼
 export async function verifyInviteCode(code: string): Promise<{ valid: boolean; familyId?: string; familyName?: string }> {
-  const { data, error } = await supabase
-    .from('families')
-    .select('id, name')
-    .eq('invite_code', code.toUpperCase())
+  // 從 invites 表獲取邀請碼
+  const { data: invite, error: inviteError } = await supabase
+    .from('invites')
+    .select('code, expires_at, used_at, families(id, name)')
+    .eq('code', code.toUpperCase())
     .single();
 
-  if (error || !data) {
+  if (inviteError || !invite) {
+    return { valid: false };
+  }
+
+  const families = invite.families as unknown as { id: string; name: string }[];
+  if (!families || families.length === 0) {
+    return { valid: false };
+  }
+
+  // 檢查是否已過期
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    return { valid: false };
+  }
+
+  // 檢查是否已使用
+  if (invite.used_at) {
     return { valid: false };
   }
 
   return { 
     valid: true, 
-    familyId: data.id, 
-    familyName: data.name 
+    familyId: families[0].id, 
+    familyName: families[0].name 
   };
 }
 

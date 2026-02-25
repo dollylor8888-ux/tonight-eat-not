@@ -212,12 +212,11 @@ export async function createFamily(
       return { family: null, member: null, error: inviteError.message };
     }
 
-    // 添加創建者為成員 (owner)
+    // 添加創建者為成員 (owner) - 不傳 user_id，避免 FK constraint
     const { data: member, error: memberError } = await supabase
       .from('family_members')
       .insert({
         family_id: family.id,
-        user_id: userId,
         display_name: displayName,
         role: role,
         is_owner: true,

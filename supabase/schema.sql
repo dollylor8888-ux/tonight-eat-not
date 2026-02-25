@@ -82,15 +82,22 @@ CREATE POLICY "Users can insert own profile" ON public.users
 CREATE POLICY "Service role can manage users" ON public.users
   FOR ALL USING (auth.jwt()->>'role' = 'service_role');
 
--- Families: 家庭成員可以讀取家庭資料
+-- Families: 家庭成員可以讀取家庭資料 + 創建者可以讀取
 CREATE POLICY "Family members can view families" ON public.families
   FOR SELECT USING (
     id IN (SELECT family_id FROM public.family_members WHERE user_id = auth.uid())
+    OR created_by = auth.uid()
   );
 
 -- Family members: 成員只能讀取自己家庭的成員
 CREATE POLICY "Members can view family members" ON public.family_members
   FOR SELECT USING (
+    family_id IN (SELECT family_id FROM public.family_members WHERE user_id = auth.uid())
+  );
+
+-- Family members: 只有家庭成員可以邀請新成員 (透過 invite)
+CREATE POLICY "Members can insert family members" ON public.family_members
+  FOR INSERT WITH CHECK (
     family_id IN (SELECT family_id FROM public.family_members WHERE user_id = auth.uid())
   );
 
@@ -106,13 +113,21 @@ CREATE POLICY "Members can insert responses" ON public.daily_responses
 CREATE POLICY "Members can update responses" ON public.daily_responses
   FOR UPDATE USING (user_id = auth.uid());
 
--- Invites: 邀請碼可以公開讀取 (用於加入家庭)
-CREATE POLICY "Anyone can view invites" ON public.invites
-  FOR SELECT USING (true);
+-- Invites: 邀請碼可以公開讀取 (用於加入家庭) - 需檢查未過期
+CREATE POLICY "Anyone can view valid invites" ON public.invites
+  FOR SELECT USING (
+    true
+    AND (expires_at IS NULL OR expires_at > NOW())
+    AND used_at IS NULL
+  );
 
-CREATE POLICY "Family members can create invites" ON public.invites
+-- Invites: 只有 owner 可以創建邀請
+CREATE POLICY "Owners can create invites" ON public.invites
   FOR INSERT WITH CHECK (
-    family_id IN (SELECT family_id FROM public.family_members WHERE user_id = auth.uid() AND is_owner = true)
+    family_id IN (
+      SELECT family_id FROM public.family_members 
+      WHERE user_id = auth.uid() AND is_owner = true
+    )
   );
 
 -- ============================================

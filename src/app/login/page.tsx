@@ -4,118 +4,73 @@ import Link from "next/link";
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { loadAppState, saveAppState } from "@/lib/store";
-import { sendPhoneOtp, verifyPhoneOtp, AuthUser } from "@/lib/auth";
 import AddToHomeScreen from "@/components/add-to-homescreen";
 
-type LoginStep = "phone" | "otp";
+type LoginStep = "phone-input" | "password-set";
 
-function LoginContent() {
-  const searchParams = useSearchParams();
+export default function LoginPage() {
   const router = useRouter();
-  const nextParam = searchParams.get("next") || "";
-  
-  // Login state
-  const [step, setStep] = useState<LoginStep>("phone");
+  const [step, setStep] = useState<LoginStep>("phone-input");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
-  // Phone login
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSeconds, setOtpSeconds] = useState(60);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
 
-  // User state
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  // 檢查是否已經登入
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  async function checkAuth() {
-    // Skip auth check for now - go directly to login
-  }
-
-  // OTP timer
-  useEffect(() => {
-    if (step !== "otp" || otpSeconds <= 0) return;
-    const timer = window.setTimeout(() => setOtpSeconds(v => v - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [step, otpSeconds]);
-
-  // ==================== Phone Login ====================
-  function sendOtp() {
+  // Handle phone + password login/signup
+  async function handleSubmit() {
     if (phone.length !== 8) {
       setError("請輸入 8 位香港手機號碼");
       return;
     }
-    setError("");
-    setLoading(true);
-    
-    // 使用 Supabase 發送 OTP
-    sendPhoneOtp(phone).then(result => {
-      if (result.error) {
-        setError(result.error);
-        setLoading(false);
-      } else {
-        setStep("otp");
-        setOtpSeconds(60);
-        setLoading(false);
-      }
-    });
-  }
+    if (!password || password.length < 6) {
+      setError("密碼至少 6 位");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("兩次密碼不一致");
+      return;
+    }
+    if (!displayName.trim()) {
+      setError("請輸入顯示名稱");
+      return;
+    }
 
-  async function verifyOtp() {
-    if (otp.length !== 6) {
-      setError("請輸入 6 位驗證碼");
-      return;
-    }
-    
     setLoading(true);
     setError("");
+
+    // Mock user creation (in real app would call Supabase)
+    const userId = `user_${phone}_${Date.now()}`;
     
-    // 使用 Supabase 驗證 OTP
-    const result = await verifyPhoneOtp(phone, otp);
-    
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-      return;
-    }
-    
-    if (result.user) {
-      setUser(result.user);
-      saveAppState({
-        loggedIn: true,
-        phone: result.user.phone,
-        email: result.user.email,
-        familyId: null,
-        familyName: null,
-        memberId: null,
-        displayName: result.user.displayName,
-        isOwner: false,
-        role: null,
-        userId: result.user.id,
-      });
-      
-      setLoading(false);
-      router.push("/onboarding");
-    } else {
-      setError("驗證失敗");
-      setLoading(false);
-    }
+    // Save to localStorage
+    saveAppState({
+      loggedIn: true,
+      phone: "+852" + phone,
+      email: null,
+      userId,
+      familyId: null,
+      familyName: null,
+      memberId: null,
+      displayName: displayName.trim(),
+      isOwner: false,
+      role: null,
+    });
+
+    setLoading(false);
+    router.push("/onboarding");
   }
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
-      <h1 className="text-[22px] font-bold">登入</h1>
+      <h1 className="text-[22px] font-bold">登入 / 註冊</h1>
       <p className="mt-2 text-base text-[#444]">
-        使用手機號碼登入
+        用手機號碼 + 密碼
       </p>
 
-      {/* Phone Input */}
-      {step === "phone" && (
-        <section className="mt-8 card p-5">
+      <section className="mt-8 card p-5 space-y-4">
+        {/* Phone */}
+        <div>
           <label className="text-[13px] text-[#444]">香港手機號碼</label>
           <div className="mt-2 flex h-12 items-center rounded-xl border border-[#ddd] bg-white px-4">
             <span className="mr-2 text-sm text-[#444]">+852</span>
@@ -130,43 +85,64 @@ function LoginContent() {
               placeholder="91234567"
             />
           </div>
-          {error && <p className="mt-2 text-[13px] text-[#e74c3c]">{error}</p>}
-          <button onClick={sendOtp} disabled={loading} className="tap-feedback mt-4 h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white disabled:opacity-60">
-            {loading ? "發送中..." : "取得驗證碼"}
-          </button>
-          <p className="mt-3 text-[13px] text-[#444]">我哋唔會亂發訊息</p>
-        </section>
-      )}
+        </div>
 
-      {/* OTP Input */}
-      {step === "otp" && (
-        <section className="mt-8 card p-5">
-          <h2 className="text-lg font-semibold">輸入 6 位驗證碼</h2>
+        {/* Display Name */}
+        <div>
+          <label className="text-[13px] text-[#444]">顯示名稱</label>
           <input
-            value={otp}
+            value={displayName}
             onChange={(e) => {
-              setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+              setDisplayName(e.target.value);
               setError("");
             }}
-            inputMode="numeric"
-            className="mt-4 h-12 w-full rounded-xl border border-[#ddd] px-4 text-center text-xl tracking-[0.35em] outline-none"
-            placeholder="_ _ _ _ _ _"
+            className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+            placeholder="你想其他人點稱呼你？"
           />
-          {error && <p className="mt-2 text-[13px] text-[#e74c3c]">{error}</p>}
-          <button onClick={verifyOtp} disabled={loading} className="tap-feedback mt-4 h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white disabled:opacity-60">
-            {loading ? "驗證中..." : "確認"}
-          </button>
-          <button
-            onClick={() => setOtpSeconds(60)}
-            disabled={otpSeconds > 0}
-            className="tap-feedback mt-3 text-[13px] text-[#444] disabled:text-[#999]"
-          >
-            {otpSeconds > 0 ? `${otpSeconds} 秒後可重發` : "重發驗證碼"}
-          </button>
-        </section>
-      )}
+        </div>
 
-      <Link href={nextParam || "/"} className="mt-8 block text-center text-sm text-[#444] underline">
+        {/* Password */}
+        <div>
+          <label className="text-[13px] text-[#444]">密碼</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("");
+            }}
+            className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+            placeholder="至少 6 位"
+          />
+        </div>
+
+        {/* Confirm Password */}
+        <div>
+          <label className="text-[13px] text-[#444]">確認密碼</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setError("");
+            }}
+            className="mt-2 h-12 w-full rounded-xl border border-[#ddd] bg-white px-4 text-base"
+            placeholder="再次輸入密碼"
+          />
+        </div>
+
+        {error && <p className="text-[13px] text-[#e74c3c]">{error}</p>}
+
+        <button 
+          onClick={handleSubmit}
+          disabled={loading}
+          className="tap-feedback h-12 w-full rounded-[14px] bg-[#f5b041] text-base font-bold text-white disabled:opacity-60"
+        >
+          {loading ? "處理中..." : "開始使用"}
+        </button>
+      </section>
+
+      <Link href="/" className="mt-8 block text-center text-sm text-[#444] underline">
         返回
       </Link>
 
@@ -174,17 +150,5 @@ function LoginContent() {
         <AddToHomeScreen variant="button" />
       </div>
     </main>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
-        <p className="text-center text-[#666]">載入中...</p>
-      </main>
-    }>
-      <LoginContent />
-    </Suspense>
   );
 }

@@ -471,37 +471,56 @@ async function generateInviteCodeWithRetry(maxRetries = 3): Promise<string> {
 
 // 驗證邀請碼
 export async function verifyInviteCode(code: string): Promise<{ valid: boolean; familyId?: string; familyName?: string }> {
-  // 從 invites 表獲取邀請碼
-  const { data: invite, error: inviteError } = await supabase
-    .from('invites')
-    .select('code, expires_at, used_at, families(id, name)')
-    .eq('code', code.toUpperCase())
-    .single();
+  try {
+    // 從 invites 表獲取邀請碼
+    const { data: invite, error: inviteError } = await supabase
+      .from('invites')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .single();
 
-  if (inviteError || !invite) {
+    console.log("Invite query result:", { invite, inviteError });
+
+    if (inviteError || !invite) {
+      console.log("Invite not found or error:", inviteError);
+      return { valid: false };
+    }
+
+    // 檢查是否已過期
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      console.log("Invite expired");
+      return { valid: false };
+    }
+
+    // 檢查是否已使用
+    if (invite.used_at) {
+      console.log("Invite already used");
+      return { valid: false };
+    }
+
+    // 獲取家庭資料
+    const { data: family, error: familyError } = await supabase
+      .from('families')
+      .select('id, name')
+      .eq('id', invite.family_id)
+      .single();
+
+    console.log("Family query result:", { family, familyError });
+
+    if (familyError || !family) {
+      console.log("Family not found or error:", familyError);
+      return { valid: false };
+    }
+
+    return { 
+      valid: true, 
+      familyId: family.id, 
+      familyName: family.name 
+    };
+  } catch (err) {
+    console.error("verifyInviteCode error:", err);
     return { valid: false };
   }
-
-  const families = invite.families as unknown as { id: string; name: string }[];
-  if (!families || families.length === 0) {
-    return { valid: false };
-  }
-
-  // 檢查是否已過期
-  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-    return { valid: false };
-  }
-
-  // 檢查是否已使用
-  if (invite.used_at) {
-    return { valid: false };
-  }
-
-  return { 
-    valid: true, 
-    familyId: families[0].id, 
-    familyName: families[0].name 
-  };
 }
 
 // 獲取邀請碼 (Supabase)

@@ -51,8 +51,10 @@ CREATE TABLE IF NOT EXISTS public.invites (
   code TEXT UNIQUE NOT NULL,
   created_by UUID REFERENCES public.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
   used_by UUID REFERENCES public.users(id),
-  used_at TIMESTAMP WITH TIME ZONE
+  used_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(code)
 );
 
 -- ============================================

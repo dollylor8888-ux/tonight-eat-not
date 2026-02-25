@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { loadAppState, saveAppState } from "@/lib/store";
 import { verifyInviteCode as verifyInviteCodeSupabase, joinFamilyByCode } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 type InviteData = {
   code: string;
@@ -127,40 +128,41 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     setError("");
 
     try {
-      // 嘗試使用 Supabase
-      const state = loadAppState();
-      const userId = state.userId;
+      // 從 Supabase Auth 獲取 userId
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       
-      if (userId) {
-        const { family, member, error: joinError } = await joinFamilyByCode(
-          userId,
-          invite.code,
-          displayName.trim(),
-          role
-        );
-        
-        if (joinError) {
-          setError(joinError);
-          setJoining(false);
-          return;
-        }
-        
-        // 保存到 localStorage
-        saveAppState({
-          familyId: family!.id,
-          familyName: family!.name,
-          memberId: member!.id,
-          displayName: member!.displayName,
-          isOwner: member!.isOwner,
-          role: member!.role,
-        });
-        
-        router.push("/app/today");
-      } else {
-        // Fallback: 使用 localStorage
-        await joinFamilyLocal(invite.familyId, invite.familyName, displayName.trim(), role);
-        router.push("/app/today");
+      if (!userId) {
+        setError("請先登入");
+        setJoining(false);
+        return;
       }
+
+      // 使用 Supabase RPC 加入家庭
+      const { family, member, error: joinError } = await joinFamilyByCode(
+        userId,
+        invite.code,
+        displayName.trim(),
+        role
+      );
+      
+      if (joinError) {
+        setError(joinError);
+        setJoining(false);
+        return;
+      }
+      
+      // 保存到 localStorage
+      saveAppState({
+        familyId: family!.id,
+        familyName: family!.name,
+        memberId: member!.id,
+        displayName: member!.displayName,
+        isOwner: member!.isOwner,
+        role: member!.role,
+      });
+      
+      router.push("/app/today");
     } catch (err: any) {
       // Fallback: 使用 localStorage
       await joinFamilyLocal(invite.familyId, invite.familyName, displayName.trim(), role);

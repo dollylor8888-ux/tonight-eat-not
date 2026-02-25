@@ -11,7 +11,6 @@ export default function CreateFamilyPage() {
   const router = useRouter();
   const [familyName, setFamilyName] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState("媽媽");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -67,8 +66,7 @@ export default function CreateFamilyPage() {
       const { family, member, error: createError } = await createFamily(
         userId,
         familyName.trim(),
-        displayName.trim(),
-        role
+        displayName.trim()
       );
       
       if (createError) {
@@ -91,7 +89,7 @@ export default function CreateFamilyPage() {
     } catch (err: any) {
       console.error("Create family error:", err);
       // Fallback to mock
-      await createFamilyMock(familyName.trim(), displayName.trim(), role);
+      await createFamilyMock(familyName.trim(), displayName.trim(), "成員");
       router.push("/app/today");
     }
     
@@ -143,28 +141,6 @@ export default function CreateFamilyPage() {
             }}
           />
           <p className="mt-1 text-xs text-[#888]">呢個名會顯示俾其他家庭成員睇</p>
-        </div>
-
-        {/* 你既角色 */}
-        <div>
-          <label className="text-[13px] text-[#444]">你既角色</label>
-          <div className="mt-2 grid grid-cols-4 gap-2">
-            {["媽媽", "爸爸", "子女", "其他"].map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`tap-feedback h-10 rounded-lg border text-sm font-medium ${
-                  role === r
-                    ? "border-[#f5b041] bg-[#fff3df] text-[#f5b041]"
-                    : "border-[#ddd] text-[#666]"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-          <p className="mt-1 text-xs text-[#888]">你係呢個家庭既邊個角色？</p>
         </div>
 
         {error && <p className="text-[13px] text-[#e74c3c]">{error}</p>}

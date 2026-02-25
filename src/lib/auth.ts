@@ -179,7 +179,7 @@ export async function createFamily(
   userId: string, 
   familyName: string, 
   displayName: string, 
-  role: string
+  role: string = "成員"
 ): Promise<{ family: Family | null; member: FamilyMember | null; error: string | null }> {
   try {
     // 生成邀請碼

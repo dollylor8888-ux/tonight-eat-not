@@ -1,14 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadAppState, saveAppState } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import AddToHomeScreen from "@/components/add-to-homescreen";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto min-h-screen w-full max-w-md bg-[#fafafa] px-4 py-10">
+        <p className="text-center text-[#666]">載入中...</p>
+      </main>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
+  
+  // Helper function to redirect after login
+  function getRedirectUrl() {
+    if (nextUrl) return nextUrl;
+    const state = loadAppState();
+    if (state.familyId) return "/app/today";
+    return "/onboarding";
+  }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
@@ -80,7 +102,7 @@ export default function LoginPage() {
           role: null,
         });
 
-        router.push("/onboarding");
+        router.push(getRedirectUrl());
       } else {
         // Sign up new user (auto-register if not exists)
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -120,7 +142,7 @@ export default function LoginPage() {
               isOwner: false,
               role: null,
             });
-            router.push("/onboarding");
+            router.push(getRedirectUrl());
             setLoading(false);
             return;
           }
@@ -174,7 +196,7 @@ export default function LoginPage() {
           role: null,
         });
 
-        router.push("/onboarding");
+        router.push(getRedirectUrl());
       }
     } catch (err: any) {
       setError(err.message || "發生錯誤");

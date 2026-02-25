@@ -49,23 +49,33 @@ export default function LoginPage() {
         });
 
         if (signInError || !data.user) {
-          setError(signInError?.message || "登入失敗");
+          // Surface clearer message for common case：未驗證 email
+          const message = signInError?.message?.toLowerCase().includes("confirm")
+            ? "請先到電郵完成驗證，再嘗試登入"
+            : (signInError?.message || "登入失敗");
+          setError(message);
           setLoading(false);
           return;
         }
 
-        // Get session
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        // Prefer the fresh session from signIn 回應，fallback 再取一次
+        const session = data.session || (await supabase.auth.getSession()).data.session;
+
+        if (!session?.user) {
+          setError("登入狀態建立失敗，請再試一次");
+          setLoading(false);
+          return;
+        }
+
         saveAppState({
           loggedIn: true,
           phone: null,
-          email: session?.user?.email || email.trim(),
-          userId: session?.user?.id,
+          email: session.user.email || email.trim(),
+          userId: session.user.id,
           familyId: null,
           familyName: null,
           memberId: null,
-          displayName: session?.user?.user_metadata?.display_name || email.split('@')[0],
+          displayName: session.user.user_metadata?.display_name || email.split('@')[0],
           isOwner: false,
           role: null,
         });
@@ -114,23 +124,52 @@ export default function LoginPage() {
             setLoading(false);
             return;
           }
-          setError(signUpError.message);
+
+          const message = signUpError.message.toLowerCase().includes("confirm")
+            ? "請先到電郵完成驗證，再嘗試登入"
+            : signUpError.message;
+          setError(message);
           setLoading(false);
           return;
         }
 
-        // 自動登入
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        // 自動登入：有些 project 開啟 email confirm 時 signUp 不會返回 session
+        // 先用 signUp 回傳的 session，若沒有則立即用密碼再登入一次以建立 session
+        let session = data.session;
+        if (!session) {
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+          });
+
+          if (loginError) {
+            const message = loginError.message.toLowerCase().includes("confirm")
+              ? "請到電郵完成驗證後再登入"
+              : loginError.message;
+            setError(message);
+            setLoading(false);
+            return;
+          }
+
+          session = loginData.session;
+        }
+
+        const authedUser = session?.user || data.user;
+        if (!authedUser) {
+          setError("註冊完成但登入狀態建立失敗，請再試一次");
+          setLoading(false);
+          return;
+        }
+
         saveAppState({
           loggedIn: true,
           phone: null,
-          email: session?.user?.email || email.trim(),
-          userId: session?.user?.id,
+          email: authedUser.email || email.trim(),
+          userId: authedUser.id,
           familyId: null,
           familyName: null,
           memberId: null,
-          displayName: displayName.trim() || email.split('@')[0],
+          displayName: displayName.trim() || authedUser.user_metadata?.display_name || email.split('@')[0],
           isOwner: false,
           role: null,
         });

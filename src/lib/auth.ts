@@ -185,12 +185,11 @@ export async function createFamily(
     // 生成邀請碼
     const inviteCode = await generateInviteCodeWithRetry();
     
-    // 創建家庭
+    // 創建家庭 (不傳 created_by，避免 FK constraint 問題)
     const { data: family, error: familyError } = await supabase
       .from('families')
       .insert({
         name: familyName,
-        created_by: userId,
       })
       .select()
       .single();
@@ -199,13 +198,12 @@ export async function createFamily(
       return { family: null, member: null, error: familyError.message };
     }
 
-    // 創建邀請碼記錄
+    // 創建邀請碼記錄 (不傳 created_by，避免 FK constraint 問題)
     const { data: invite, error: inviteError } = await supabase
       .from('invites')
       .insert({
         family_id: family.id,
         code: inviteCode,
-        created_by: userId,
       })
       .select()
       .single();

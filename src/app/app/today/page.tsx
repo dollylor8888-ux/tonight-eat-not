@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import Toast from "@/components/toast";
 import UpsellModal from "@/components/upsell-modal";
 import InviteModal from "@/components/invite-modal";
+import PushNotificationManager from "@/components/push-notification";
 import { loadAppState, getFamilyMembers as getFamilyMembersLocal } from "@/lib/store";
 import { getFamilyMembers as getFamilyMembersSupabase, getTodayResponses as getTodayResponsesSupabase, submitResponse as submitResponseSupabase } from "@/lib/auth";
 
@@ -354,6 +355,8 @@ export default function TodayPage() {
       <Toast message={toast} visible={Boolean(toast)} onClose={() => setToast("")} />
       <UpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} />
       <InviteModal open={showInvite} onClose={() => setShowInvite(false)} onMemberJoined={handleMemberJoined} />
+      
+      <PushNotificationManager />
     </>
   );
 }

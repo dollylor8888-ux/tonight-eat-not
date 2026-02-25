@@ -25,10 +25,36 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const [role, setRole] = useState("子女");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // 檢查登入狀態 - 先 check localStorage，再 check Supabase
+  useEffect(() => {
+    async function checkAuth() {
+      // 先用 localStorage 快速檢查
+      const state = loadAppState();
+      
+      // 再用 Supabase 確認
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // 更新登入狀態
+      if (user && !state.loggedIn) {
+        // Supabase 有登入但 localStorage 冇，save 入去
+        saveAppState({
+          ...state,
+          loggedIn: true,
+          userId: user.id,
+        });
+      }
+      
+      setInitialLoading(false);
+    }
+    
+    checkAuth();
+  }, []);
 
   // 檢查登入狀態
   const state = loadAppState();
-  const isLoggedIn = state.loggedIn;
+  const isLoggedIn = state.loggedIn || state.userId;
   const hasFamily = !!state.familyId;
 
   useEffect(() => {
@@ -101,13 +127,20 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
   // 未登入 → 導去登入
   useEffect(() => {
-    if (!loading && !isLoggedIn) {
+    if (initialLoading || loading) return;
+    
+    // 如果已經有家庭，顯示已經加入咗
+    if (hasFamily) {
+      return; // 顯示已經加入
+    }
+    
+    if (!isLoggedIn) {
       const timer = setTimeout(() => {
         router.push(`/login?next=/j/${code}`);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [router, code, isLoggedIn, loading]);
+  }, [router, code, isLoggedIn, hasFamily, initialLoading, loading]);
 
   function handleConfirm() {
     setStep("form");

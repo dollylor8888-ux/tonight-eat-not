@@ -263,69 +263,31 @@ export async function joinFamilyByCode(
   role: string
 ): Promise<{ family: Family | null; member: FamilyMember | null; error: string | null }> {
   try {
-    // 查找家庭 (通過邀請碼)
-    const { data: invite, error: inviteError } = await supabase
-      .from('invites')
-      .select('*, families(*)')
-      .eq('code', inviteCode.toUpperCase())
-      .single();
+    // 使用 RPC 加入家庭 (Security Definer)
+    const { data, error } = await supabase.rpc('join_family', {
+      p_code: inviteCode,
+      p_display_name: displayName,
+      p_role: role,
+    });
 
-    if (inviteError || !invite) {
-      return { family: null, member: null, error: '邀請碼無效' };
+    if (error || !data) {
+      return { family: null, member: null, error: error?.message || '加入失敗' };
     }
 
-    const family = invite.families;
-
-    // 檢查是否已經是成員
-    const { data: existingMember } = await supabase
-      .from('family_members')
-      .select('*')
-      .eq('family_id', family.id)
-      .eq('user_id', userId)
-      .single();
-
-    if (existingMember) {
-      return { 
-        family: null, 
-        member: null, 
-        error: '你已經是這個家庭的成員' 
-      };
+    if (!data.success) {
+      return { family: null, member: null, error: data.error || '邀請碼無效' };
     }
 
-    // 加入家庭
-    const { data: member, error: memberError } = await supabase
-      .from('family_members')
-      .insert({
-        family_id: family.id,
-        user_id: userId,
-        display_name: displayName,
-        role: role,
-        is_owner: false,
-      })
-      .select()
-      .single();
-
-    if (memberError) {
-      return { family: null, member: null, error: memberError.message };
+    // 獲取家庭和成員資料
+    const familyData = await getUserFamily(userId);
+    
+    if (!familyData) {
+      return { family: null, member: null, error: '获取家庭资料失败' };
     }
 
     return {
-      family: {
-        id: family.id,
-        name: family.name,
-        inviteCode: family.invite_code,
-        createdBy: family.created_by,
-        createdAt: family.created_at,
-      },
-      member: {
-        id: member.id,
-        familyId: member.family_id,
-        userId: member.user_id,
-        displayName: member.display_name,
-        role: member.role,
-        isOwner: member.is_owner,
-        joinedAt: member.joined_at,
-      },
+      family: familyData.family,
+      member: familyData.member,
       error: null,
     };
   } catch (err: any) {

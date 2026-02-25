@@ -190,7 +190,6 @@ export async function createFamily(
       .from('families')
       .insert({
         name: familyName,
-        invite_code: inviteCode,
         created_by: userId,
       })
       .select()
@@ -198,6 +197,21 @@ export async function createFamily(
 
     if (familyError) {
       return { family: null, member: null, error: familyError.message };
+    }
+
+    // 創建邀請碼記錄
+    const { data: invite, error: inviteError } = await supabase
+      .from('invites')
+      .insert({
+        family_id: family.id,
+        code: inviteCode,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (inviteError) {
+      return { family: null, member: null, error: inviteError.message };
     }
 
     // 添加創建者為成員 (owner)
@@ -221,7 +235,7 @@ export async function createFamily(
       family: {
         id: family.id,
         name: family.name,
-        inviteCode: family.invite_code,
+        inviteCode: invite?.code || inviteCode,
         createdBy: family.created_by,
         createdAt: family.created_at,
       },
@@ -249,16 +263,18 @@ export async function joinFamilyByCode(
   role: string
 ): Promise<{ family: Family | null; member: FamilyMember | null; error: string | null }> {
   try {
-    // 查找家庭
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .select('*')
-      .eq('invite_code', inviteCode.toUpperCase())
+    // 查找家庭 (通過邀請碼)
+    const { data: invite, error: inviteError } = await supabase
+      .from('invites')
+      .select('*, families(*)')
+      .eq('code', inviteCode.toUpperCase())
       .single();
 
-    if (familyError || !family) {
+    if (inviteError || !invite) {
       return { family: null, member: null, error: '邀請碼無效' };
     }
+
+    const family = invite.families;
 
     // 檢查是否已經是成員
     const { data: existingMember } = await supabase
@@ -341,11 +357,20 @@ export async function getUserFamily(userId: string): Promise<{ family: Family | 
     return { family: null, member: null };
   }
 
+  // 獲取邀請碼
+  const { data: invite } = await supabase
+    .from('invites')
+    .select('code')
+    .eq('family_id', family.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .single();
+
   return {
     family: {
       id: family.id,
       name: family.name,
-      inviteCode: family.invite_code,
+      inviteCode: invite?.code || null,
       createdBy: family.created_by,
       createdAt: family.created_at,
     },
@@ -507,16 +532,18 @@ export async function verifyInviteCode(code: string): Promise<{ valid: boolean; 
 // 獲取邀請碼 (Supabase)
 export async function getInviteCodeSupabase(familyId: string): Promise<string | null> {
   const { data, error } = await supabase
-    .from('families')
-    .select('invite_code')
-    .eq('id', familyId)
+    .from('invites')
+    .select('code')
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .single();
 
   if (error || !data) {
     return null;
   }
 
-  return data.invite_code;
+  return data.code;
 }
 
 // 同步到 localStorage (作為 fallback)

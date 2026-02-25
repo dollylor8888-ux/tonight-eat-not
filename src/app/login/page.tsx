@@ -16,15 +16,15 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [isLogin, setIsLogin] = useState(false);
 
-  // Check if already logged in
+  // Check if already logged in (only on mount)
   useEffect(() => {
     const state = loadAppState();
+    // Only redirect if localStorage shows logged in with family
     if (state.loggedIn && state.familyId) {
       router.push("/app/today");
-    } else if (state.loggedIn) {
-      router.push("/onboarding");
     }
-  }, [router]);
+    // Don't auto-redirect to onboarding, let user stay on login
+  }, []);
 
   // Handle email + password login/signup with Supabase Auth
   async function handleSubmit() {

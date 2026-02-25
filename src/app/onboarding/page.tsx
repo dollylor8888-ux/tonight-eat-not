@@ -10,16 +10,14 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
-  // Check auth on page load
+  // Check auth on page load (only once)
   useEffect(() => {
     async function checkAuth() {
       // Check localStorage first
       const state = loadAppState();
       
-      // Then verify with Supabase
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
+      // If not logged in locally, redirect to login
+      if (!state.loggedIn) {
         router.push("/login");
         return;
       }
@@ -34,7 +32,8 @@ export default function OnboardingPage() {
     }
     
     checkAuth();
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (

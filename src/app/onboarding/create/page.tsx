@@ -15,18 +15,20 @@ export default function CreateFamilyPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Check auth on page load
+  // Check auth on page load (only once)
   useEffect(() => {
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Check localStorage first
+      const state = loadAppState();
       
-      if (!user) {
+      if (!state.loggedIn) {
         router.push("/login");
         return;
       }
       
       // Load display name from user metadata
-      if (user.user_metadata?.display_name) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.display_name) {
         setDisplayName(user.user_metadata.display_name);
       }
       
@@ -34,7 +36,8 @@ export default function CreateFamilyPage() {
     }
     
     checkAuth();
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleCreate() {
     if (!familyName.trim()) {

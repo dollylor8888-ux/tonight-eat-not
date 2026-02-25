@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loadAppState, saveAppState } from "@/lib/store";
 import { createFamily, getFamilyMembers, getTodayResponses, Family, FamilyMember } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export default function CreateFamilyPage() {
   const router = useRouter();
@@ -28,15 +29,13 @@ export default function CreateFamilyPage() {
     setError("");
     
     try {
-      // 從 localStorage 獲取 userId
-      const state = loadAppState();
-      const userId = state.userId;
+      // 從 Supabase Auth 獲取 userId
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       
       if (!userId) {
-        // Fallback: 使用 localStorage mock
-        console.log("Using localStorage fallback (no Supabase user)");
-        await createFamilyMock(familyName.trim(), displayName.trim(), role);
-        router.push("/app/today");
+        setError("請先登入");
+        setLoading(false);
         return;
       }
       

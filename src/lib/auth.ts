@@ -486,13 +486,15 @@ export async function verifyInviteCode(code: string): Promise<{ valid: boolean; 
       return { valid: false };
     }
 
-    // 檢查是否已過期 (如果 expires_at 存在)
+    // 檢查是否已過期 (if expires_at column exists, otherwise skip)
+    // Skip check if column doesn't exist to avoid errors
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
       console.log("Invite expired");
       return { valid: false };
     }
 
-    // 檢查是否已使用 (如果 used_at 存在)
+    // 檢查是否已使用 (if used_at column exists)
+    // Skip check if column doesn't exist to avoid errors
     if (invite.used_at) {
       console.log("Invite already used");
       return { valid: false };

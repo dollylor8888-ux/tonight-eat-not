@@ -1,4 +1,4 @@
--- Join Family RPC Function (Fixed - no expires_at check)
+-- Join Family RPC Function (Simple version - no invite update to avoid FK issues)
 CREATE OR REPLACE FUNCTION public.join_family(
   p_code TEXT,
   p_display_name TEXT,
@@ -22,7 +22,7 @@ BEGIN
     RETURN JSONB_BUILD_OBJECT('success', false, 'error', 'Not authenticated');
   END IF;
 
-  -- Find valid invite (skip expires_at check since column may not exist)
+  -- Find valid invite
   SELECT * INTO v_invite
   FROM public.invites
   WHERE code = UPPER(p_code)
@@ -43,18 +43,8 @@ BEGIN
   END IF;
 
   -- Insert member
-  INSERT INTO public.family_members (family_id, display_name, role, is_owner)
-  VALUES (v_family_id, p_display_name, p_role, false);
-
-  -- Mark invite as used (skip if used_by FK fails - user may not exist in users table yet)
-  BEGIN
-    UPDATE public.invites
-    SET used_by = v_user_id, used_at = NOW()
-    WHERE id = v_invite.id;
-  EXCEPTION WHEN foreign_key_violation THEN
-    -- Ignore FK violation - user record doesn't exist yet
-    NULL;
-  END;
+  INSERT INTO public.family_members (family_id, display_name, role, is_owner, user_id)
+  VALUES (v_family_id, p_display_name, p_role, false, v_user_id);
 
   -- Return success
   SELECT JSONB_BUILD_OBJECT(

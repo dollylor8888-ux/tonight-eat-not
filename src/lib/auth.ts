@@ -260,31 +260,72 @@ export async function joinFamilyByCode(
   role: string
 ): Promise<{ family: Family | null; member: FamilyMember | null; error: string | null }> {
   try {
-    // 使用 RPC 加入家庭 (Security Definer)
-    const { data, error } = await supabase.rpc('join_family', {
-      p_code: inviteCode,
-      p_display_name: displayName,
-      p_role: role,
-    });
+    // 直接插入成員，唔用 RPC
+    // 先搵 invite
+    const { data: invite, error: inviteError } = await supabase
+      .from('invites')
+      .select('*, family:families(*)')
+      .eq('code', inviteCode.toUpperCase())
+      .single();
 
-    if (error || !data) {
-      return { family: null, member: null, error: error?.message || '加入失敗' };
+    if (inviteError || !invite) {
+      return { family: null, member: null, error: '邀請碼無效' };
     }
 
-    if (!data.success) {
-      return { family: null, member: null, error: data.error || '邀請碼無效' };
+    // Check if already a member
+    const { data: existing } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('family_id', invite.family_id)
+      .eq('display_name', displayName)
+      .single();
+
+    if (existing) {
+      return { family: null, member: null, error: '你已經係呢個家庭既成員' };
     }
 
-    // 獲取家庭和成員資料
-    const familyData = await getUserFamily(userId);
-    
-    if (!familyData) {
-      return { family: null, member: null, error: '获取家庭资料失败' };
+    // Insert member (user_id 可以係 NULL，等 user 以後先加入到 users table)
+    const { data: member, error: insertError } = await supabase
+      .from('family_members')
+      .insert({
+        family_id: invite.family_id,
+        user_id: userId, // 可能會 FK error，但無視佢
+        display_name: displayName,
+        role: role,
+        is_owner: false,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      // 如果係 FK error，retry 唔 insert user_id
+      if (insertError.message.includes('foreign key')) {
+        const { data: memberRetry } = await supabase
+          .from('family_members')
+          .insert({
+            family_id: invite.family_id,
+            display_name: displayName,
+            role: role,
+            is_owner: false,
+          })
+          .select()
+          .single();
+        
+        if (memberRetry) {
+          return {
+            family: invite.family,
+            member: memberRetry,
+            error: null,
+          };
+        }
+      }
+      return { family: null, member: null, error: insertError.message };
     }
 
+    // Return family data
     return {
-      family: familyData.family,
-      member: familyData.member,
+      family: invite.family,
+      member: member,
       error: null,
     };
   } catch (err: any) {

@@ -46,10 +46,15 @@ BEGIN
   INSERT INTO public.family_members (family_id, display_name, role, is_owner)
   VALUES (v_family_id, p_display_name, p_role, false);
 
-  -- Mark invite as used (only if used_at column exists)
-  UPDATE public.invites
-  SET used_by = v_user_id, used_at = NOW()
-  WHERE id = v_invite.id;
+  -- Mark invite as used (skip if used_by FK fails - user may not exist in users table yet)
+  BEGIN
+    UPDATE public.invites
+    SET used_by = v_user_id, used_at = NOW()
+    WHERE id = v_invite.id;
+  EXCEPTION WHEN foreign_key_violation THEN
+    -- Ignore FK violation - user record doesn't exist yet
+    NULL;
+  END;
 
   -- Return success
   SELECT JSONB_BUILD_OBJECT(

@@ -89,6 +89,13 @@ function LoginContent() {
           return;
         }
 
+        // 確保用戶資料存在
+        await supabase.from('users').upsert({
+          id: session.user.id,
+          email: session.user.email,
+          display_name: session.user.user_metadata?.display_name || email.split('@')[0],
+        }, { onConflict: 'id' });
+
         saveAppState({
           loggedIn: true,
           phone: null,
@@ -130,6 +137,16 @@ function LoginContent() {
             }
             
             const { data: { session } } = await supabase.auth.getSession();
+            
+            // 確保用戶資料存在
+            if (session?.user) {
+              await supabase.from('users').upsert({
+                id: session.user.id,
+                email: session.user.email,
+                display_name: session.user.user_metadata?.display_name || email.split('@')[0],
+              }, { onConflict: 'id' });
+            }
+            
             saveAppState({
               loggedIn: true,
               phone: null,
@@ -182,6 +199,13 @@ function LoginContent() {
           setLoading(false);
           return;
         }
+
+        // 建立用戶資料到 users 表
+        await supabase.from('users').insert({
+          id: authedUser.id,
+          email: authedUser.email,
+          display_name: displayName.trim() || authedUser.user_metadata?.display_name || email.split('@')[0],
+        });
 
         saveAppState({
           loggedIn: true,

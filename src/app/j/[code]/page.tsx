@@ -26,24 +26,30 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasFamily, setHasFamily] = useState(false);
 
   // 檢查登入狀態 - 先 check localStorage，再 check Supabase
   useEffect(() => {
     async function checkAuth() {
       // 先用 localStorage 快速檢查
       const state = loadAppState();
+      setHasFamily(!!state.familyId);
       
       // 再用 Supabase 確認
       const { data: { user } } = await supabase.auth.getUser();
       
       // 更新登入狀態
-      if (user && !state.loggedIn) {
-        // Supabase 有登入但 localStorage 冇，save 入去
-        saveAppState({
-          ...state,
-          loggedIn: true,
-          userId: user.id,
-        });
+      if (user) {
+        setIsLoggedIn(true);
+        if (!state.loggedIn) {
+          // Supabase 有登入但 localStorage 冇，save 入去
+          saveAppState({
+            ...state,
+            loggedIn: true,
+            userId: user.id,
+          });
+        }
       }
       
       setInitialLoading(false);
@@ -51,11 +57,6 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     
     checkAuth();
   }, []);
-
-  // 檢查登入狀態
-  const state = loadAppState();
-  const isLoggedIn = state.loggedIn || state.userId;
-  const hasFamily = !!state.familyId;
 
   useEffect(() => {
     // 嘗試使用 Supabase 驗證邀請碼
